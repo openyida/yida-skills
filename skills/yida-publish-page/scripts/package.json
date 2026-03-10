@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@babel/standalone": "^7.15.1",
+    "uglify-js": "^3.19.3"
+  }
+}

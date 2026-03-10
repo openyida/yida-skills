@@ -2,7 +2,7 @@
 
 > 宜搭（Yida）AI 技能合集 —— 让 AI 助手具备完整的宜搭平台开发能力
 
-一套专为 [钉钉宜搭](https://www.aliwork.com) 平台设计的 AI Skills，覆盖从登录、建应用、建表单、开发自定义页面到发布的完整研发链路。配合 **Aone Copilot** 或 **Claude** 使用，让 AI 真正能帮你端到端地完成宜搭应用开发。
+一套专为 [钉钉宜搭](https://www.aliwork.com) 平台设计的 AI Skills，覆盖从登录、建应用、建表单、开发自定义页面到发布的完整研发链路。配合 **OpenCode** 或 **ClaudeCode** 使用，让 AI 真正能帮你端到端地完成宜搭应用开发。
 
 ---
 
@@ -24,18 +24,37 @@
 
 ## 快速开始
 
+### 使用 openyida 默认工程模板（推荐）
+
 ```bash
 # 克隆仓库
-git clone <repo-url> yida-skills
+git clone <repo-url> openyida
 
-# 一键安装所有技能
-cd yida-skills
+# 1.一键安装所有技能
+cd yida-openyida
 chmod +x install.sh
 ./install.sh
+
+# 2.使用代码编辑器打开项目，打开 AI Coding 工具，输入：帮我创建一个生日祝福小游戏
+
 ```
+### 使用自己的项目工程，请参考文件结构约定
 
-详细使用说明请参阅 [getting-started.md](./getting-started.md)。
-
+```
+项目根目录/
+├── README.md                # 用来判断根目录路径，必须存在
+├── config.json              # 全局配置（loginUrl、defaultBaseUrl）
+├── .cache/
+│   └── cookies.json         # 登录态缓存和其他临时文件（运行时自动生成）
+├── pages/src/
+│   └── <项目名>.js          # 自定义页面源码
+├── pages/dist/
+│   └── <项目名>.js          # 自定义页面编译后的代码
+├── prd/
+│   └── <项目名>.md          # 需求文档（含所有配置信息）
+└── .claude/
+    └── skills/              # 各子技能目录
+```
 ---
 
 ## 目录结构
@@ -72,6 +91,31 @@ yida-skills/
 
 ---
 
+## DEMO 展示
+
+### 💰 小工具 - 个人薪资计算器
+
+![薪资计算器](https://gw.alicdn.com/imgextra/i2/O1CN017TeJuE1reVH2Dj7b7_!!6000000005656-2-tps-5114-2468.png)
+
+---
+
+### 🌐  Landing Page - 智联协同
+
+企业级产品介绍页，一句话生成完整 Landing Page。
+
+![智联协同](https://gw.alicdn.com/imgextra/i1/O1CN01EZtvfs1cxXV00UaXi_!!6000000003667-2-tps-5118-2470.png)
+
+---
+
+### 🏮 运营场景 - 看图猜灯谜
+
+AI 生成灯谜图片，用户猜答案，猜错了有 AI 幽默提示。
+
+![看图猜灯谜-2](https://img.alicdn.com/imgextra/i3/O1CN01dCoscP25jSAtAB9o3_!!6000000007562-2-tps-2144-1156.png)
+
+---
+
+
 ## License
 
-[MIT](./LICENSE) © 2026 马明
+[MIT](./LICENSE) © 2026 天晟
