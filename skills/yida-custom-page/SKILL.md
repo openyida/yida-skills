@@ -208,7 +208,44 @@ this.forceUpdate();
 
 ### 编码注意事项
 
-1. **输入法处理**：使用 `_isComposing` 标记配合 `compositionstart` / `compositionend` 事件，正确处理中文输入法的组合输入状态，避免输入过程中触发提交
+1. **this 指向问题**：在 `renderJsx` 内部定义的事件处理函数中，`this` 不指向页面实例。有两种解决方案：
+
+   **方案一（推荐）：使用箭头函数**
+   ```javascript
+   export function renderJsx() {
+     const { timestamp } = this.state;
+     
+     // 箭头函数自动捕获 this
+     const handleSubmit = () => {
+       this.setCustomState({ submitted: true });
+       this.utils.toast({ title: '提交成功', type: 'success' });
+     };
+
+     return (
+       <button onClick={handleSubmit}>提交</button>
+     );
+   }
+   ```
+
+   **方案二：保存 self 引用**
+   ```javascript
+   export function renderJsx() {
+     const { timestamp } = this.state;
+     const self = this;  // 保存 this 引用
+
+     function handleSubmit() {
+       // 使用 self 调用
+       self.setCustomState({ submitted: true });
+       self.utils.toast({ title: '提交成功', type: 'success' });
+     }
+
+     return (
+       <button onClick={handleSubmit}>提交</button>
+     );
+   }
+   ```
+
+2. **输入法处理**：使用 `_isComposing` 标记配合 `compositionstart` / `compositionend` 事件，正确处理中文输入法的组合输入状态，避免输入过程中触发提交
 2. **定时器清理**：在 `didUnmount` 中必须清理所有通过 `setInterval` / `setTimeout` 创建的定时器，防止内存泄漏
 3. **错误处理**：所有 API 调用（`this.utils.yida.*`、`fetch`）必须使用 `.catch()` 处理异常，并通过 `this.utils.toast({ title: message, type: 'error' })` 向用户展示错误提示
 4. **样式方式**：所有样式通过 JavaScript 对象定义（内联样式），在 `renderJsx` 中通过 `style` 属性应用，不使用外部 CSS 文件

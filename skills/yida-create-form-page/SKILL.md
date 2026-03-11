@@ -17,7 +17,7 @@ description: 宜搭表单页面创建与更新技能，支持创建新表单（s
 ### create 模式（创建新表单）
 
 ```bash
-node .claude/skills/yida-create-form-page/scripts/create-form-page.js create <appType> <formTitle> <fieldsJsonFile>
+node .claude/skills/yida-create-form-page/scripts/create-form-page.js create <appType> <formTitle> <fieldsJsonOrFile>
 ```
 
 **参数说明**：
@@ -26,7 +26,7 @@ node .claude/skills/yida-create-form-page/scripts/create-form-page.js create <ap
 | --- | --- | --- |
 | `appType` | 是 | 应用 ID，如 `APP_XXX` |
 | `formTitle` | 是 | 表单名称 |
-| `fieldsJsonFile` | 是 | 字段定义 JSON 文件路径 |
+| `fieldsJsonOrFile` | 是 | 字段定义，支持两种格式：JSON 字符串（以 `[` 开头）或 JSON 文件路径 |
 
 **示例**：
 
@@ -74,20 +74,32 @@ node .claude/skills/yida-create-form-page/scripts/create-form-page.js update "AP
 
 ## 字段定义 JSON 格式
 
-字段定义文件是一个 JSON 数组，每个元素描述一个字段。
+字段定义是一个 JSON 数组，每个元素描述一个字段。**支持两种格式**：
+
+### 格式一（推荐）
+
+直接在对象中定义 `type` 和 `label`：
 
 ```json
 [
   { "type": "TextField", "label": "姓名", "required": true },
   { "type": "SelectField", "label": "部门", "options": ["技术部", "产品部", "设计部"] },
-  { "type": "DateField", "label": "入职日期" },
-  { "type": "NumberField", "label": "年龄" },
-  { "type": "TableField", "label": "费用明细", "children": [
-    { "type": "TextField", "label": "项目" },
-    { "type": "NumberField", "label": "金额" }
-  ]}
+  { "type": "DateField", "label": "入职日期" }
 ]
 ```
+
+### 格式二（兼容）
+
+将字段属性放在 `field` 子对象中：
+
+```json
+[
+  { "field": { "type": "TextField", "label": "姓名" }, "required": true },
+  { "field": { "type": "SelectField", "label": "部门", "options": ["技术部"] } }
+]
+```
+
+> 两种格式效果相同，推荐使用格式一，更简洁。
 
 **字段属性**：
 

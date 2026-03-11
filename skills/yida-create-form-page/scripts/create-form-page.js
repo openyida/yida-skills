@@ -120,7 +120,7 @@ function parseArgs() {
       console.error('示例：node .claude/skills/yida-create-form-page/scripts/create-form-page.js create "APP_XXX" "员工信息登记" fields.json');
       process.exit(1);
     }
-    return { mode: "create", appType: args[1], formTitle: args[2], fieldsJsonFile: args[3] };
+    return { mode: "create", appType: args[1], formTitle: args[2], fieldsJsonOrFile: args[3] };
   }
 
   if (mode === "update") {
@@ -134,7 +134,7 @@ function parseArgs() {
 
   // 兼容旧用法（无 mode 参数，默认 create 模式）
   if (args.length >= 3 && mode !== "create" && mode !== "update") {
-    return { mode: "create", appType: args[0], formTitle: args[1], fieldsJsonFile: args[2] };
+    return { mode: "create", appType: args[0], formTitle: args[1], fieldsJsonOrFile: args[2] };
   }
 
   console.error("用法:");
@@ -261,22 +261,29 @@ function refreshCsrfToken() {
 
 // ── 读取字段定义 ─────────────────────────────────────
 
-function readFieldsDefinition(fieldsJsonFile) {
-  const resolvedPath = path.resolve(fieldsJsonFile);
-  if (!fs.existsSync(resolvedPath)) {
-    console.error(`  ❌ 字段定义文件不存在: ${resolvedPath}`);
-    process.exit(1);
+function readFieldsDefinition(fieldsJsonOrFile) {
+  var rawContent;
+
+  // 判断是 JSON 字符串还是文件路径
+  if (fieldsJsonOrFile.trimStart().startsWith("[")) {
+    rawContent = fieldsJsonOrFile;
+  } else {
+    var resolvedPath = path.resolve(fieldsJsonOrFile);
+    if (!fs.existsSync(resolvedPath)) {
+      console.error("  ❌ 字段定义文件不存在: " + resolvedPath);
+      process.exit(1);
+    }
+    rawContent = fs.readFileSync(resolvedPath, "utf-8");
   }
 
   try {
-    const content = fs.readFileSync(resolvedPath, "utf-8");
-    const fields = JSON.parse(content);
+    const fields = JSON.parse(rawContent);
     if (!Array.isArray(fields) || fields.length === 0) {
       throw new Error("字段定义必须是非空数组");
     }
     return fields;
   } catch (parseError) {
-    console.error(`  ❌ 解析字段定义失败: ${parseError.message}`);
+    console.error("  ❌ 解析字段定义失败: " + parseError.message);
     process.exit(1);
   }
 }
@@ -2050,21 +2057,21 @@ async function saveSchemaAndUpdateConfig(authRef, appType, formUuid, schema, ver
 // ── create 模式主流程 ─────────────────────────────────
 
 async function mainCreate(parsedArgs, csrfToken, cookies, baseUrl, cookieData) {
-  const { appType, formTitle, fieldsJsonFile } = parsedArgs;
+  const { appType, formTitle, fieldsJsonOrFile } = parsedArgs;
 
   console.error("=".repeat(50));
   console.error("  yida-create-form-page - 宜搭表单页面创建工具");
   console.error("=".repeat(50));
   console.error("\n  应用 ID:    " + appType);
   console.error("  表单名称:   " + formTitle);
-  console.error("  字段定义:   " + fieldsJsonFile);
+  console.error("  字段定义:   " + fieldsJsonOrFile);
 
   // 登录态引用对象，供 requestWithAutoLogin 原地更新
   var authRef = { csrfToken: csrfToken, cookies: cookies, baseUrl: baseUrl, cookieData: cookieData };
 
   // Step 2: 读取字段定义
   console.error("\n📋 Step 2: 读取字段定义");
-  const fields = readFieldsDefinition(fieldsJsonFile);
+  const fields = readFieldsDefinition(fieldsJsonOrFile);
   console.error("  ✅ 已读取 " + fields.length + " 个字段定义");
   fields.forEach(function (field, index) {
     console.error("     " + (index + 1) + ". " + field.type + ": " + field.label);
