@@ -21,7 +21,7 @@ jobs:
 
     - name: Validate JavaScript syntax
       run: |
-        for file in skills/*/scripts/*.js; do
+        for file in skills/*/scripts/*.js skills/shared/scripts/*.js; do
           node --check "$file" || exit 1
         done
 
