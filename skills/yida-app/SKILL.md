@@ -312,7 +312,7 @@ node publish.js APP_XXX FORM-XXXXXX pages/src/xxx.js
 
 ---
 
-### Step 8：输出访问链接并直接使用系统浏览器打开
+### Step 7：输出访问链接并直接使用系统浏览器打开
 * 访问地址参考「宜搭应用 url 规则说明」
 
 ## 快速参考
