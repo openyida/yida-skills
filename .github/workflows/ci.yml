@@ -27,4 +27,7 @@ jobs:
 
     - name: Validate JSON files
       run: |
-        find . -name "*.json" -path "./skills/*" -exec node -e "JSON.parse(require('fs').readFileSync('{}'))" \; -print
+        find . -name "*.json" -path "./skills/*" | while read -r file; do
+          node -e "JSON.parse(require('fs').readFileSync(process.argv[1]))" -- "$file" || exit 1
+          echo "  ✅ $file"
+        done

@@ -10,7 +10,6 @@ logout.py - 宜搭平台退出登录工具。
   下次调用 yida-login 时将重新触发扫码登录。
 """
 
-import json
 import os
 import sys
 
@@ -43,7 +42,7 @@ def main():
         return
 
     with open(COOKIE_FILE, "w", encoding="utf-8") as file:
-        json.dump([], file)
+        file.write("")
 
     print("\n  ✅ 已清空 Cookie，登录态已失效。")
     print("  下次调用 yida-login 时将重新触发扫码登录。")

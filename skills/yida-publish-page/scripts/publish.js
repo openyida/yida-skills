@@ -64,10 +64,10 @@ function compileSource(sourcePath) {
   const compiledFileName = `${parsedPath.name}.js`;
   const compiledPath = path.join(findProjectRoot(), "pages", "dist", compiledFileName);
 
-  console.log(`[1/4] 读取 ${sourceFileName} 源码...`);
+  console.error(`[1/4] 读取 ${sourceFileName} 源码...`);
   const sourceCode = fs.readFileSync(sourcePath, "utf-8");
 
-  console.log(`[2/4] Babel 编译 ${sourceFileName}...`);
+  console.error(`[2/4] Babel 编译 ${sourceFileName}...`);
   const babelResult = babelTransform(sourceCode, {}, false, { RE_VERSION: "7.4.0" });
   if (babelResult.error instanceof Error) {
     const err = babelResult.error;
@@ -84,7 +84,7 @@ function compileSource(sourcePath) {
     process.exit(1);
   }
 
-  console.log(`[3/4] UglifyJS 压缩 → ${compiledFileName}...`);
+  console.error(`[3/4] UglifyJS 压缩 → ${compiledFileName}...`);
   const uglifyResult = UglifyJS.minify(babelResult.compiled);
   if (uglifyResult.error) {
     console.error(`  压缩失败：${uglifyResult.error.message}`);
@@ -98,7 +98,7 @@ function compileSource(sourcePath) {
   }
 
   fs.writeFileSync(compiledPath, uglifyResult.code, "utf-8");
-  console.log(`  ✅ 编译压缩完成：${compiledPath}`);
+  console.error(`  ✅ 编译压缩完成：${compiledPath}`);
 
   return { sourceCode, compiledCode: uglifyResult.code };
 }
@@ -118,7 +118,7 @@ function generateSuffix() {
 // ── 2. 构建 Schema ──────────────────────────────────
 
 function buildSchemaContent(sourceCode, compiledCode, formUuid) {
-  console.log("[4/4] 构建 Schema...");
+  console.error("[4/4] 构建 Schema...");
 
   // 构造函数代码（固定模板）
   const constructorCode = "function constructor() {\nvar module = { exports: {} };\nvar _this = this;\nthis.__initMethods__(module.exports, module);\nObject.keys(module.exports).forEach(function(item) {\n  if(typeof module.exports[item] === 'function'){\n    _this[item] = module.exports[item];\n  }\n});\n\n}";
@@ -381,7 +381,7 @@ function sendSaveRequest(csrfToken, cookies, schemaContent, baseUrl, appType, fo
       let responseData = "";
       response.on("data", (chunk) => { responseData += chunk; });
       response.on("end", () => {
-        console.log(`  HTTP 状态码: ${response.statusCode}`);
+        console.error(`  HTTP 状态码: ${response.statusCode}`);
         let parsed;
         try {
           parsed = JSON.parse(responseData);
@@ -392,13 +392,13 @@ function sendSaveRequest(csrfToken, cookies, schemaContent, baseUrl, appType, fo
         }
         // 检测登录过期（errorCode: "307"）
         if (isLoginExpired(parsed)) {
-          console.log(`  检测到登录过期: ${parsed.errorMsg}`);
+          console.error(`  检测到登录过期: ${parsed.errorMsg}`);
           resolve({ __needLogin: true });
           return;
         }
         // 检测 csrf_token 过期（errorCode: "TIANSHU_000030"）
         if (isCsrfTokenExpired(parsed)) {
-          console.log(`  检测到 csrf_token 过期: ${parsed.errorMsg}`);
+          console.error(`  检测到 csrf_token 过期: ${parsed.errorMsg}`);
           resolve({ __csrfExpired: true });
           return;
         }
@@ -453,7 +453,7 @@ function sendUpdateConfigRequest(csrfToken, cookies, baseUrl, appType, formUuid,
       let responseData = "";
       response.on("data", (chunk) => { responseData += chunk; });
       response.on("end", () => {
-        console.log(`  HTTP 状态码: ${response.statusCode}`);
+        console.error(`  HTTP 状态码: ${response.statusCode}`);
         let parsed;
         try {
           parsed = JSON.parse(responseData);
@@ -464,13 +464,13 @@ function sendUpdateConfigRequest(csrfToken, cookies, baseUrl, appType, formUuid,
         }
         // 检测登录过期（errorCode: "307"）
         if (isLoginExpired(parsed)) {
-          console.log(`  检测到登录过期: ${parsed.errorMsg}`);
+          console.error(`  检测到登录过期: ${parsed.errorMsg}`);
           resolve({ __needLogin: true });
           return;
         }
         // 检测 csrf_token 过期（errorCode: "TIANSHU_000030"）
         if (isCsrfTokenExpired(parsed)) {
-          console.log(`  检测到 csrf_token 过期: ${parsed.errorMsg}`);
+          console.error(`  检测到 csrf_token 过期: ${parsed.errorMsg}`);
           resolve({ __csrfExpired: true });
           return;
         }
@@ -500,31 +500,32 @@ async function main() {
   const compiledPath = path.join(findProjectRoot(), "pages", "dist", `${parsedSource.name}.js`);
 
   // Step 1: 编译源码 + 构建 Schema
-  console.log("\n📦 Step 1: 编译源码 & 构建 Schema\n");
+  console.error("\n📦 Step 1: 编译源码 & 构建 Schema\n");
   const { sourceCode, compiledCode } = compileSource(sourcePath);
   const schemaContent = buildSchemaContent(sourceCode, compiledCode, formUuid);
-  console.log("  ✅ Schema 构建完成！");
+  console.error("  ✅ Schema 构建完成！");
 
   // Step 2: 读取登录态（优先从本地缓存 Cookie 中提取 csrf_token）
-  console.log("\n🔑 Step 2: 读取登录态");
+  console.error("\n🔑 Step 2: 读取登录态");
   let cookieData = loadCookieData();
   if (!cookieData || !cookieData.csrf_token) {
-    console.log("  ⚠️  未找到本地登录态或 csrf_token，触发登录...");
+    console.error("  ⚠️  未找到本地登录态或 csrf_token，触发登录...");
     cookieData = triggerLogin();
   }
   let { csrf_token: csrfToken, cookies } = cookieData;
   let baseUrl = resolveBaseUrl(cookieData);
 
-  console.log("=".repeat(50));
-  console.log("  yida-publish - 宜搭页面发布工具");
-  console.log("=".repeat(50));
-  console.log(`\n  平台地址: ${baseUrl}`);
-  console.log(`  应用ID:   ${appType}`);
-  console.log(`  表单ID:   ${formUuid}`);  console.log(`  源文件：   ${sourcePath}`);
-  console.log(`  编译产物：${compiledPath}`);
-  console.log(`  输出目录：pages/dist/`);
+  console.error("=".repeat(50));
+  console.error("  yida-publish - 宜搭页面发布工具");
+  console.error("=".repeat(50));
+  console.error(`\n  平台地址: ${baseUrl}`);
+  console.error(`  应用ID:   ${appType}`);
+  console.error(`  表单ID:   ${formUuid}`);
+  console.error(`  源文件：   ${sourcePath}`);
+  console.error(`  编译产物：${compiledPath}`);
+  console.error(`  输出目录：pages/dist/`);
   // Step 3: 发布 Schema（307 时刷新 csrf_token，302 时自动重登录，均自动重试）
-  console.log("\n📤 Step 3: 发布 Schema\n");
+  console.error("\n📤 Step 3: 发布 Schema\n");
   let response = await sendSaveRequest(csrfToken, cookies, schemaContent, baseUrl, appType, formUuid);
 
   if (response && response.__csrfExpired) {
@@ -532,7 +533,7 @@ async function main() {
     csrfToken = cookieData.csrf_token;
     cookies = cookieData.cookies;
     baseUrl = resolveBaseUrl(cookieData);
-    console.log("  🔄 重新发送 saveFormSchema 请求（csrf_token 已刷新）...");
+    console.error("  🔄 重新发送 saveFormSchema 请求（csrf_token 已刷新）...");
     response = await sendSaveRequest(csrfToken, cookies, schemaContent, baseUrl, appType, formUuid);
   }
 
@@ -541,7 +542,7 @@ async function main() {
     csrfToken = cookieData.csrf_token;
     cookies = cookieData.cookies;
     baseUrl = resolveBaseUrl(cookieData);
-    console.log("  🔄 重新发送 saveFormSchema 请求...");
+    console.error("  🔄 重新发送 saveFormSchema 请求...");
     response = await sendSaveRequest(csrfToken, cookies, schemaContent, baseUrl, appType, formUuid);
   }
 
@@ -557,13 +558,13 @@ async function main() {
   const content = response.content || {};
   const savedFormUuid = content.formUuid || formUuid;
   const version = content.version || 0;
-  console.log("  ✅ Schema 发布成功！");
-  console.log(`  formUuid: ${savedFormUuid}`);
-  console.log(`  version:  ${version}`);
+  console.error("  ✅ Schema 发布成功！");
+  console.error(`  formUuid: ${savedFormUuid}`);
+  console.error(`  version:  ${version}`);
 
   // Step 4: 更新表单配置（307 时刷新 csrf_token，302 时自动重登录，均自动重试）
-  console.log("\n⚙️  Step 4: 更新表单配置\n");
-  console.log("  发送 updateFormConfig 请求...");
+  console.error("\n⚙️  Step 4: 更新表单配置\n");
+  console.error("  发送 updateFormConfig 请求...");
   let configResponse = await sendUpdateConfigRequest(csrfToken, cookies, baseUrl, appType, savedFormUuid, version, 8);
 
   if (configResponse && configResponse.__csrfExpired) {
@@ -571,7 +572,7 @@ async function main() {
     csrfToken = cookieData.csrf_token;
     cookies = cookieData.cookies;
     baseUrl = resolveBaseUrl(cookieData);
-    console.log("  🔄 重新发送 updateFormConfig 请求（csrf_token 已刷新）...");
+    console.error("  🔄 重新发送 updateFormConfig 请求（csrf_token 已刷新）...");
     configResponse = await sendUpdateConfigRequest(csrfToken, cookies, baseUrl, appType, savedFormUuid, version, 8);
   }
 
@@ -580,17 +581,17 @@ async function main() {
     csrfToken = cookieData.csrf_token;
     cookies = cookieData.cookies;
     baseUrl = resolveBaseUrl(cookieData);
-    console.log("  🔄 重新发送 updateFormConfig 请求...");
+    console.error("  🔄 重新发送 updateFormConfig 请求...");
     configResponse = await sendUpdateConfigRequest(csrfToken, cookies, baseUrl, appType, savedFormUuid, version, 8);
   }
 
   // 输出结果
-  console.log("\n" + "=".repeat(50));
+  console.error("\n" + "=".repeat(50));
   if (configResponse && configResponse.success) {
-    console.log("  ✅ 发布成功！");
-    console.log(`  formUuid: ${savedFormUuid}`);
-    console.log(`  version:  ${version}`);
-    console.log(`  配置已更新: MINI_RESOURCE = 8`);
+    console.error("  ✅ 发布成功！");
+    console.error(`  formUuid: ${savedFormUuid}`);
+    console.error(`  version:  ${version}`);
+    console.error(`  配置已更新: MINI_RESOURCE = 8`);
   } else {
     const errorMsg = configResponse ? configResponse.errorMsg || "未知错误" : "请求失败";
     console.error(`  ⚠️  配置更新失败: ${errorMsg}`);
@@ -599,7 +600,7 @@ async function main() {
       console.error(`  响应详情: ${JSON.stringify(configResponse, null, 2)}`);
     }
   }
-  console.log("=".repeat(50));
+  console.error("=".repeat(50));
 }
 
 main().catch((error) => {
