@@ -1,29 +1,11 @@
-#!/usr/bin/env python3
-"""
-login.py - 宜搭平台登录态管理脚本。
-
-用法：
-  python3 login.py
-
-流程：
-1. 检查本地缓存（Cookie + base_url），直接用 base_url/myApp 无头验证
-2. 若无效或不存在，打开浏览器扫码登录
-3. 登录成功后跳转 /myApp 获取 _csrf_token、loginUser、corpId
-4. 以 JSON 格式输出到 stdout，供其他脚本通过管道解析
-
-登录地址从项目根目录的 config.json 中读取（loginUrl 字段）
-"""
-
 import json
 import os
 import sys
-import time
 from urllib.parse import urlparse
 
 from playwright.sync_api import sync_playwright
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-
 
 def find_project_root(start_dir):
     """从 start_dir 向上查找含 README.md 或 .git 的项目根目录。"""
@@ -40,7 +22,6 @@ PROJECT_ROOT = find_project_root(SCRIPT_DIR)
 CONFIG_FILE = os.path.join(PROJECT_ROOT, "config.json")
 COOKIE_FILE = os.path.join(PROJECT_ROOT, ".cache", "cookies.json")
 
-
 def load_config():
     """从项目根目录的 config.json 读取配置。"""
     if not os.path.exists(CONFIG_FILE):
@@ -49,13 +30,11 @@ def load_config():
     with open(CONFIG_FILE, "r", encoding="utf-8") as file:
         return json.load(file)
 
-
 _config = load_config()
 LOGIN_URL = _config["loginUrl"]
 DEFAULT_BASE_URL = _config["defaultBaseUrl"]
 
 # ── Cookie 持久化 ─────────────────────────────────────
-
 
 def save_login_cache(cookies, base_url=None):
     """将 Cookie 和 base_url 一起保存到本地缓存文件。"""
@@ -66,7 +45,6 @@ def save_login_cache(cookies, base_url=None):
     with open(COOKIE_FILE, "w", encoding="utf-8") as file:
         json.dump(cache, file, ensure_ascii=False, indent=2)
     print(f"  Cookie 已保存到 {COOKIE_FILE}", file=sys.stderr)
-
 
 def load_login_cache():
     """
@@ -98,158 +76,80 @@ def load_login_cache():
 
     return None, None
 
+# ── 从 Cookie 列表中提取登录信息 ──────────────────────
 
-# ── 从 /myApp 页面提取信息 ────────────────────────────
-
-
-def fetch_page_info(page, target_url):
+def extract_info_from_cookies(cookies):
     """
-    跳转到指定的 /myApp URL，提取 _csrf_token、loginUser、corpId 和 base_url。
+    从 Cookie 列表中直接提取 csrf_token、corp_id、user_id。
+
+    提取规则：
+    - csrf_token：name="tianshu_csrf_token" 的 cookie value
+    - corp_id + user_id：name="tianshu_corp_user" 的 cookie value，
+      格式为 "{corpId}_{userId}"，按最后一个 "_" 分隔
+      示例：value="ding9a0954b4f9d9d40ef5bf40eda33b7ba0_19552253733782"
+            → corp_id="ding9a0954b4f9d9d40ef5bf40eda33b7ba0", user_id="19552253733782"
 
     Args:
-        page: Playwright Page 对象
-        target_url: 要跳转的完整 URL（如 https://abcd.aliwork.com/myApp）
+        cookies: Cookie 字典列表（每个元素含 name、value 等字段）
 
     Returns:
-        (csrf_token, login_user, corp_id, base_url) 元组，获取失败的字段返回 None
+        (csrf_token, corp_id, user_id) 元组，未找到的字段返回 None
     """
-    print(f"  📄 跳转到 {target_url} 获取 csrf_token、loginUser 和 corpId...", file=sys.stderr)
-
-    try:
-        page.goto(target_url, wait_until="networkidle", timeout=600_000)
-    except Exception as error:
-        print(f"  ⚠️  访问超时，尝试继续提取: {error}", file=sys.stderr)
-
-    # 检查是否被重定向到登录页
-    current_url = page.url
-    parsed_current = urlparse(current_url)
-    if "login" in parsed_current.netloc.lower() or "login" in parsed_current.path.lower():
-        print("  ❌ 被重定向到登录页，Cookie 无效。", file=sys.stderr)
-        return None, None, None, None
-
-    # 提取 csrf_token
     csrf_token = None
-    for _ in range(10):
-        try:
-            csrf_token = page.evaluate("""
-                () => {
-                    var input = document.querySelector("input[name='_csrf_token']");
-                    return input ? input.value : null;
-                }
-            """)
-            if csrf_token:
-                break
-        except Exception:
-            pass
-        time.sleep(1)
-
-    if csrf_token:
-        print(f"  ✅ csrf_token 获取成功: {csrf_token[:16]}...", file=sys.stderr)
-    else:
-        print("  ⚠️  未找到 csrf_token hidden input", file=sys.stderr)
-
-    # 提取 loginUser
-    login_user = None
-    try:
-        login_user = page.evaluate("() => window.loginUser || null")
-    except Exception:
-        pass
-
-    if login_user:
-        print(f"  ✅ loginUser 获取成功: {login_user.get('userName', '?')} ({login_user.get('userId', '?')})", file=sys.stderr)
-    else:
-        print("  ⚠️  未找到 window.loginUser", file=sys.stderr)
-
-    # 提取 corpId
     corp_id = None
-    try:
-        corp_id = page.evaluate(
-            "() => window.pageConfig && window.pageConfig.corpId ? window.pageConfig.corpId : null"
-        )
-    except Exception:
-        pass
+    user_id = None
 
-    if corp_id:
-        print(f"  ✅ corpId 获取成功: {corp_id}", file=sys.stderr)
-    else:
-        print("  ⚠️  未找到 window.pageConfig.corpId", file=sys.stderr)
+    for cookie in cookies:
+        if cookie.get("name") == "tianshu_csrf_token":
+            csrf_token = cookie.get("value")
+        elif cookie.get("name") == "tianshu_corp_user":
+            value = cookie.get("value", "")
+            # 按最后一个 "_" 分隔，corpId 本身可能包含 "_"
+            last_underscore = value.rfind("_")
+            if last_underscore > 0:
+                corp_id = value[:last_underscore]
+                user_id = value[last_underscore + 1:]
 
-    # 提取 base_url（跳转后的实际域名）
-    final_parsed = urlparse(page.url)
-    base_url = f"{final_parsed.scheme}://{final_parsed.netloc}" if final_parsed.netloc else None
+    return csrf_token, corp_id, user_id
 
-    if base_url:
-        print(f"  ✅ base_url 获取成功: {base_url}", file=sys.stderr)
-    else:
-        print("  ⚠️  未能获取 base_url", file=sys.stderr)
+# ── 验证本地缓存的 Cookie ─────────────────────────────
 
-    return csrf_token, login_user, corp_id, base_url
-
-
-# ── 无头验证 ──────────────────────────────────────────
-
-
-def try_headless_login(saved_cookies, saved_base_url):
+def try_cached_login(saved_cookies, saved_base_url):
     """
-    使用已有 Cookie 无头验证登录态。
+    尝试直接从本地缓存的 Cookie 中提取登录信息。
 
-    关键改进：直接用保存的 base_url 跳转 /myApp，不再重走 LOGIN_URL，
-    避免域名跳转导致 Cookie 域不匹配的问题。
+    不再需要无头浏览器访问 /myApp，直接检查 Cookie 中是否存在
+    tianshu_csrf_token，存在即视为有效。
 
     Returns:
-        成功返回 (csrf_token, login_user, corp_id, base_url, cookies)，失败返回 None
+        成功返回 (csrf_token, corp_id, user_id, base_url, cookies)，失败返回 None
     """
-    # 确定验证用的基础 URL
-    verify_base = saved_base_url or DEFAULT_BASE_URL
-    verify_url = f"{verify_base.rstrip('/')}/myApp"
+    csrf_token, corp_id, user_id = extract_info_from_cookies(saved_cookies)
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True)
-        context = browser.new_context()
-        context.add_cookies(saved_cookies)
-        page = context.new_page()
-
-        csrf_token, login_user, corp_id, base_url = fetch_page_info(page, verify_url)
-
-        if csrf_token:
-            print("  ✅ Cookie 有效！", file=sys.stderr)
-            cookies = context.cookies()
-            final_base = base_url or verify_base
-            save_login_cache(cookies, final_base)
-            browser.close()
-            return csrf_token, login_user, corp_id, final_base, cookies
-
-        # 如果用保存的 base_url 失败了，再尝试默认域名（可能 base_url 过期）
-        if saved_base_url and saved_base_url != DEFAULT_BASE_URL:
-            print("  🔄 尝试使用默认域名验证...", file=sys.stderr)
-            fallback_url = f"{DEFAULT_BASE_URL}/myApp"
-            csrf_token, login_user, corp_id, base_url = fetch_page_info(page, fallback_url)
-
-            if csrf_token:
-                print("  ✅ Cookie 有效（通过默认域名）！", file=sys.stderr)
-                cookies = context.cookies()
-                final_base = base_url or DEFAULT_BASE_URL
-                save_login_cache(cookies, final_base)
-                browser.close()
-                return csrf_token, login_user, corp_id, final_base, cookies
-
-        print("  ❌ Cookie 已失效，需要重新登录。", file=sys.stderr)
-        browser.close()
+    if not csrf_token:
+        print("  ❌ Cookie 中无 tianshu_csrf_token，需要重新登录。", file=sys.stderr)
         return None
 
+    base_url = saved_base_url or DEFAULT_BASE_URL
+    print(f"  ✅ Cookie 有效！csrf_token: {csrf_token[:16]}...", file=sys.stderr)
+    if corp_id:
+        print(f"  ✅ corpId: {corp_id}", file=sys.stderr)
+    if user_id:
+        print(f"  ✅ userId: {user_id}", file=sys.stderr)
+
+    return csrf_token, corp_id, user_id, base_url, saved_cookies
 
 # ── 有头扫码登录 ──────────────────────────────────────
-
 
 def interactive_login():
     """
     打开有头浏览器让用户扫码登录。
 
-    登录成功后在同一浏览器上下文中跳转 /myApp 获取信息，
-    确保所有域（www/ding）的 Cookie 都被保存。
+    登录成功后直接从 Cookie 中提取 csrf_token、corpId、userId，
+    无需跳转 /myApp。
 
     Returns:
-        (csrf_token, login_user, corp_id, base_url, cookies) 元组
+        (csrf_token, corp_id, user_id, base_url, cookies) 元组
     """
     print("\n🔐 正在打开浏览器，请扫码登录...", file=sys.stderr)
     with sync_playwright() as pw:
@@ -271,75 +171,114 @@ def interactive_login():
 
         # 获取登录后的实际域名（可能从 www 跳转到 ding）
         post_login_parsed = urlparse(page.url)
-        post_login_base = f"{post_login_parsed.scheme}://{post_login_parsed.netloc}"
-        my_app_url = f"{post_login_base}/myApp"
+        base_url = f"{post_login_parsed.scheme}://{post_login_parsed.netloc}"
 
-        # 在同一上下文中跳转 /myApp 获取信息
-        csrf_token, login_user, corp_id, base_url = fetch_page_info(page, my_app_url)
-
-        # 保存所有域的 Cookie
+        # 直接从 Cookie 中提取所需信息，无需跳转 /myApp
         cookies = context.cookies()
-        final_base = base_url or post_login_base
-        save_login_cache(cookies, final_base)
         browser.close()
 
+    csrf_token, corp_id, user_id = extract_info_from_cookies(cookies)
+
     if not csrf_token:
-        print("  ❌ 登录成功但无法获取 csrf_token，请重试。", file=sys.stderr)
+        print("  ❌ 登录成功但 Cookie 中无 tianshu_csrf_token，请重试。", file=sys.stderr)
         sys.exit(1)
 
-    return csrf_token, login_user, corp_id, final_base, cookies
+    print(f"  ✅ csrf_token: {csrf_token[:16]}...", file=sys.stderr)
+    if corp_id:
+        print(f"  ✅ corpId: {corp_id}", file=sys.stderr)
+    if user_id:
+        print(f"  ✅ userId: {user_id}", file=sys.stderr)
 
+    save_login_cache(cookies, base_url)
+    return csrf_token, corp_id, user_id, base_url, cookies
 
 # ── 核心入口 ──────────────────────────────────────────
-
 
 def ensure_login():
     """
     确保拥有有效的登录态。
 
+    优先从本地缓存 Cookie 中直接提取，无需无头浏览器验证。
+    若 Cookie 中无 tianshu_csrf_token，则触发扫码登录。
+
     Returns:
-        (csrf_token, login_user, corp_id, base_url, cookies) 元组
+        (csrf_token, corp_id, user_id, base_url, cookies) 元组
     """
     saved_cookies, saved_base_url = load_login_cache()
 
     if saved_cookies:
-        print("🔍 检测到本地 Cookie，尝试无头模式验证...", file=sys.stderr)
-        result = try_headless_login(saved_cookies, saved_base_url)
+        print("🔍 检测到本地 Cookie，尝试直接提取登录信息...", file=sys.stderr)
+        result = try_cached_login(saved_cookies, saved_base_url)
         if result:
             return result
 
     return interactive_login()
 
+# ── 刷新 csrf_token（TIANSHU_000030 场景） ────────────
+
+def refresh_csrf_token():
+    """
+    从本地缓存 Cookie 中重新提取 csrf_token。
+
+    适用于接口响应体 errorCode 为 "TIANSHU_000030"（csrf 校验失败）的场景：
+    Cookie 仍有效，但 csrf_token 已过期，无需重新扫码登录。
+    直接从 Cookie 中读取最新的 tianshu_csrf_token 值。
+
+    Returns:
+        成功返回 (csrf_token, corp_id, user_id, base_url, cookies)，失败退出进程
+    """
+    print("🔄 csrf_token 已过期，正在从 Cookie 重新提取...", file=sys.stderr)
+
+    saved_cookies, saved_base_url = load_login_cache()
+    if not saved_cookies:
+        print("  ❌ 本地无有效 Cookie，无法刷新，需要重新登录。", file=sys.stderr)
+        sys.exit(1)
+
+    csrf_token, corp_id, user_id = extract_info_from_cookies(saved_cookies)
+
+    if not csrf_token:
+        print("  ❌ Cookie 中无 tianshu_csrf_token，需要重新登录。", file=sys.stderr)
+        sys.exit(1)
+
+    base_url = saved_base_url or DEFAULT_BASE_URL
+    print(f"  ✅ csrf_token 提取成功: {csrf_token[:16]}...", file=sys.stderr)
+    return csrf_token, corp_id, user_id, base_url, saved_cookies
 
 # ── CLI 入口 ──────────────────────────────────────────
 
-
 def main():
-    print("=" * 50, file=sys.stderr)
-    print("  yida-login - 宜搭登录态管理工具", file=sys.stderr)
-    print("=" * 50, file=sys.stderr)
-    print(f"\n  登录地址: {LOGIN_URL}", file=sys.stderr)
+    # 支持 --refresh-csrf 模式：仅重新提取 csrf_token，不重新扫码登录
+    if "--refresh-csrf" in sys.argv:
+        print("=" * 50, file=sys.stderr)
+        print("  yida-login - csrf_token 刷新模式", file=sys.stderr)
+        print("=" * 50, file=sys.stderr)
 
-    csrf_token, login_user, corp_id, base_url, cookies = ensure_login()
+        csrf_token, corp_id, user_id, base_url, cookies = refresh_csrf_token()
+    else:
+        print("=" * 50, file=sys.stderr)
+        print("  yida-login - 宜搭登录态管理工具", file=sys.stderr)
+        print("=" * 50, file=sys.stderr)
+        print(f"\n  登录地址: {LOGIN_URL}", file=sys.stderr)
+
+        csrf_token, corp_id, user_id, base_url, cookies = ensure_login()
 
     print(f"\n  _csrf_token: {csrf_token}", file=sys.stderr)
-    if login_user:
-        print(f"  loginUser: {login_user.get('userName', '?')} ({login_user.get('userId', '?')})", file=sys.stderr)
     if corp_id:
         print(f"  corpId: {corp_id}", file=sys.stderr)
+    if user_id:
+        print(f"  userId: {user_id}", file=sys.stderr)
     if base_url:
         print(f"  base_url: {base_url}", file=sys.stderr)
     print("=" * 50, file=sys.stderr)
 
     output = {
         "csrf_token": csrf_token,
-        "login_user": login_user,
         "corp_id": corp_id,
+        "user_id": user_id,
         "base_url": base_url,
         "cookies": cookies,
     }
     print(json.dumps(output, ensure_ascii=False))
-
 
 if __name__ == "__main__":
     main()

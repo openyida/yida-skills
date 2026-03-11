@@ -38,8 +38,10 @@ node publish.js APP_XXX FORM-XXXXXX pages/src/xxx.js
 1. **编译源码**：通过 `@ali/vu-babel-transform` 将 JSX 转换为 ES5，再通过 UglifyJS 压缩
 2. **构建 Schema**：通过代码动态构建完整的 Schema JSON，将编译后的 `source` 和 `compiled` 填入 `actions.module`
 3. **读取登录态**：读取项目根目录的 `.cache/cookies.json`；若不存在则自动调用 `login.py` 触发扫码登录
-4. **发布 Schema**：通过 HTTP POST 调用 `saveFormSchema` 接口保存 Schema；若接口返回 302 登录重定向，自动重新登录后重试（最多一次）
-5. **更新表单配置**：调用 `updateFormConfig` 接口，设置 `MINI_RESOURCE` 配置为 `8`；若接口返回 302 登录重定向，自动重新登录后重试（最多一次）
+4. **发布 Schema**：通过 HTTP POST 调用 `saveFormSchema` 接口保存 Schema；根据响应体 `errorCode` 自动处理异常：
+   - `errorCode: "TIANSHU_000030"`（csrf 校验失败）→ 自动刷新 csrf_token 后重试
+   - `errorCode: "307"`（登录过期）→ 自动重新登录后重试
+5. **更新表单配置**：调用 `updateFormConfig` 接口，设置 `MINI_RESOURCE` 配置为 `8`；同样根据响应体 `errorCode` 自动处理异常（同上）
 
 > **注意**：发布目标地址由 `.cache/cookies.json` 中保存的 `base_url` 决定（即登录后浏览器实际跳转到的域名），而非 `config.json` 中的 `loginUrl`。详见 `yida-login` 技能文档。
 > **注意**：当发布页面碰到组织 corpId 不匹配 或  "您当前未在「xxx」组织内" 时，可以询问是否创建新的应用发布。

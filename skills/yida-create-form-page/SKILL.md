@@ -340,25 +340,27 @@ SERIALNUMBER("corpId", "appType", "formUuid", "fieldId", "{\"type\":\"custom\",\
 
 1. 准备字段定义 JSON 文件
 2. 读取项目根目录的 `.cache/cookies.json` 获取登录态（包含 corpId）；若不存在则自动调用 `login.py` 触发扫码登录
-3. 调用 `saveFormSchemaInfo` 接口创建空白表单，获取 formUuid；若接口返回 302 登录重定向，自动重新登录后重试（最多一次）
+3. 调用 `saveFormSchemaInfo` 接口创建空白表单，获取 formUuid；根据响应体 `errorCode` 自动处理异常：
+   - `errorCode: "TIANSHU_000030"`（csrf 校验失败）→ 自动刷新 csrf_token 后重试
+   - `errorCode: "307"`（登录过期）→ 自动重新登录后重试
 4. 根据字段定义生成表单 Schema JSON（SerialNumberField 的 formula 会自动使用 corpId、appType、formUuid 和 fieldId 构建）
-5. 调用 `saveFormSchema` 接口保存 Schema；若接口返回 302 登录重定向，自动重新登录后重试（最多一次）
-6. 调用 `updateFormConfig` 接口更新表单配置（MINI_RESOURCE = 0）；若接口返回 302 登录重定向，自动重新登录后重试（最多一次）
-7. **将返回的 `formUuid` 和各字段 `fieldId` 记录到 `prd/<项目名>.md` 的表单配置章节**
+5. 调用 `saveFormSchema` 接口保存 Schema；同样根据响应体 `errorCode` 自动处理异常（同上）
+6. 调用 `updateFormConfig` 接口更新表单配置（MINI_RESOURCE = 0）；同样根据响应体 `errorCode` 自动处理异常（同上）
 
 ### update 模式
 
 1. 读取项目根目录的 `.cache/cookies.json` 获取登录态（包含 corpId）；若不存在则自动调用 `login.py` 触发扫码登录
-2. 调用 `getFormSchema` 接口获取当前表单的完整 Schema；若接口返回 302 登录重定向，自动重新登录后重试（最多一次）
+2. 调用 `getFormSchema` 接口获取当前表单的完整 Schema；根据响应体 `errorCode` 自动处理异常：
+   - `errorCode: "TIANSHU_000030"`（csrf 校验失败）→ 自动刷新 csrf_token 后重试
+   - `errorCode: "307"`（登录过期）→ 自动重新登录后重试
 3. 解析修改定义（JSON 字符串或 JSON 文件）
 4. 按顺序执行每条修改操作：
    - **add**：构建新字段组件，插入到指定位置（或末尾）
    - **delete**：按标签查找并移除字段
    - **update**：按标签查找字段并更新其属性
 5. 为所有 SerialNumberField 设置 formula（使用 corpId、appType、formUuid 和 fieldId）
-6. 调用 `saveFormSchema` 接口保存修改后的 Schema；若接口返回 302 登录重定向，自动重新登录后重试（最多一次）
-7. 调用 `updateFormConfig` 接口更新表单配置（MINI_RESOURCE = 0）；若接口返回 302 登录重定向，自动重新登录后重试（最多一次）
-8. 输出更新结果到 stdout
+6. 调用 `saveFormSchema` 接口保存修改后的 Schema；同样根据响应体 `errorCode` 自动处理异常（同上）
+7. 调用 `updateFormConfig` 接口更新表单配置（MINI_RESOURCE = 0）；同样根据响应体 `errorCode` 自动处理异常（同上）
 
 ## 文件结构
 
@@ -488,10 +490,9 @@ yida-create-form-page/
 > **提示**：如果需要创建的是自定义展示页面（无字段，用于部署 JSX 代码），请使用 `yida-create-page` 技能。
 
 ## 注意事项
-
+- **临时文件写在当前工程根目录的 .cache 文件夹中，如果没有就创建一个文件夹，注意不要写在系统的其他文件夹中**
 - update 模式中，修改定义 JSON 的操作按顺序执行，注意操作间的依赖关系（如先删后加）
 - 字段匹配基于中文标签（`label.zh_CN`），确保标签名称准确
 - 新增字段时会自动更新 `componentsMap`，无需手动处理
 - 建议在重要修改前先通过 `get-schema` 技能查看当前 Schema 结构
 - 脚本兼容旧的 create 模式调用方式（不带 `create` 前缀），但推荐使用新的显式模式参数
-- **临时文件写在当前工程根目录的 .cache 文件夹中，如果没有就创建一个文件夹，注意不要写在系统的其他文件夹中**

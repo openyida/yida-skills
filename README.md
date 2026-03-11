@@ -27,17 +27,15 @@
 ### 使用 openyida 默认工程模板（推荐）
 
 ```bash
-# 克隆仓库
-git clone <repo-url> openyida
+# 1.克隆仓库
 
-# 1.一键安装所有技能
-cd yida-openyida
-chmod +x install.sh
-./install.sh
+  git clone https://github.com/openyida/openyida.git
 
-# 2.使用代码编辑器打开项目，打开 AI Coding 工具，输入：帮我创建一个生日祝福小游戏
+# 2. 使用代码编辑器打开项目，打开 AI Coding 工具，输入：执行安装脚本
+# 3. Skills 安装完成后，AI Coding 工具，输入：帮我搭建一个生日祝福小游戏应用
 
 ```
+
 ### 使用自己的项目工程，请参考文件结构约定
 
 ```

@@ -42,7 +42,9 @@ node .claude/skills/yida-create-page/scripts/create-page.js "APP_xxx" "游戏主
 ## 调用流程
 
 1. 读取项目根目录的 `.cache/cookies.json` 获取登录态；若不存在则自动调用 `login.py` 触发扫码登录
-2. 调用 `saveFormSchemaInfo` 接口创建 display 类型页面；若接口返回 302 登录重定向，自动重新登录后重试（最多一次）
+2. 调用 `saveFormSchemaInfo` 接口创建 display 类型页面；根据响应体 `errorCode` 自动处理异常：
+   - `errorCode: "TIANSHU_000030"`（csrf 校验失败）→ 自动刷新 csrf_token 后重试
+   - `errorCode: "307"`（登录过期）→ 自动重新登录后重试
 3. 从返回值中获取页面 ID（formUuid）
 4. **将 `pageId`（formUuid）记录到 `prd/<项目名>.md` 的应用配置章节**
 

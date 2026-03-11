@@ -26,10 +26,9 @@ python3 .claude/skills/yida-login/scripts/login.py
 ## 工作流程
 
 1. 检查本地是否存在 `.cache/cookies.json` 缓存（包含 Cookie 和 `base_url`）
-2. 若存在，**直接用保存的 `base_url` 跳转 `/myApp`** 无头验证 Cookie 有效性（不再重走登录地址，避免域名跳转导致验证失败）
-3. 若 `base_url` 验证失败，回退到默认域名再试一次
-4. 若 Cookie 无效或不存在，打开有头浏览器让用户扫码登录
-5. 登录成功后在同一浏览器上下文中跳转 `/myApp` 获取信息，保存所有域的 Cookie 和 `base_url`
+2. 若存在，**直接从 Cookie 中提取** `csrf_token`（`tianshu_csrf_token`）、`corp_id` 和 `user_id`（`tianshu_corp_user`），无需访问任何页面
+3. 若 Cookie 中无 `tianshu_csrf_token`，视为失效，打开有头浏览器让用户扫码登录
+4. 登录成功后直接从 Cookie 中提取所需信息，保存 Cookie 和 `base_url`（从登录后实际跳转的 URL 获取）
 
 ## 前置依赖
 
@@ -56,13 +55,15 @@ yida-login/
 
 ```json
 {
-  "csrf_token": "xxx-xxx-xxx",
-  "login_user": { "userName": "张三", "userId": "012345" },
-  "corp_id": "dingxxxxxxxxx",
+  "csrf_token": "b2a5d192-db90-484c-880f-9b48edd396d5",
+  "corp_id": "ding9a0954b4f9d9d40ef5bf40eda33b7ba0",
+  "user_id": "19552253733782",
   "base_url": "https://abcd.aliwork.com",
   "cookies": [...]
 }
 ```
+
+> `csrf_token` 从 Cookie `tianshu_csrf_token` 的 value 中提取；`corp_id` 和 `user_id` 从 Cookie `tianshu_corp_user` 的 value 中提取，格式为 `{corpId}_{userId}`，按最后一个 `_` 分隔。
 
 > `base_url` 是登录后浏览器实际跳转到的域名（如 `https://abcd.aliwork.com`），**可能与 `config.json` 中的 `loginUrl` 不同**。其他脚本应使用此值作为 API 请求的基础地址，而非硬编码域名。
 
@@ -79,7 +80,7 @@ yida-login/
 }
 ```
 
-缓存中同时保存 `base_url`，无头验证时直接使用，避免重新访问登录地址导致域名跳转问题。
+`csrf_token`、`corp_id`、`user_id` 不存储在缓存中，每次启动时直接从 Cookie 列表中提取（`tianshu_csrf_token` 和 `tianshu_corp_user` 字段）。
 
 ## 全局配置
 
@@ -96,6 +97,17 @@ yida-login/
 | --- | --- |
 | `loginUrl` | 扫码登录页面地址（登录成功后平台可能自动跳转到其他域名） |
 | `defaultBaseUrl` | API 请求的默认基础地址（仅当 `base_url` 未从登录态中获取时作为兜底使用，正常流程不会用到） |
+
+## 错误处理机制
+
+各 skill 脚本通过解析接口响应体的 `errorCode` 字段来判断登录态异常，并自动调用本技能处理：
+
+| errorCode | 含义 | 处理方式 |
+| --- | --- | --- |
+| `"TIANSHU_000030"` | csrf 校验失败（csrf_token 过期） | 调用 `login.py --refresh-csrf` 无头刷新 csrf_token，无需重新扫码 |
+| `"307"` | 登录状态已过期（Cookie 失效） | 调用 `login.py` 触发完整重新登录（可能需要扫码） |
+
+> **注意**：错误判断基于响应体 JSON 的 `errorCode` 字段，而非 HTTP 状态码。
 
 ## 与其他技能配合
 

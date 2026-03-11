@@ -49,7 +49,9 @@ node .claude/skills/yida-create-app/scripts/create-app.js "考勤管理" "员工
 
 1. 读取项目根目录的 `.cache/cookies.json` 获取登录态；若不存在则自动调用 `login.py` 触发扫码登录
 2. 构建 `registerApp` 请求参数
-3. 发送 POST 请求到 `/query/app/registerApp.json`；若接口返回 302 登录重定向，自动重新登录后重试（最多一次）
+3. 发送 POST 请求到 `/query/app/registerApp.json`；根据响应体 `errorCode` 自动处理异常：
+   - `errorCode: "TIANSHU_000030"`（csrf 校验失败）→ 自动刷新 csrf_token 后重试
+   - `errorCode: "307"`（登录过期）→ 自动重新登录后重试
 4. 从返回值中获取应用 ID（appType）
 5. 将 `appType` 记录到 `prd/<项目名>.md` 备用
 

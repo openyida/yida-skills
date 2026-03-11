@@ -75,16 +75,46 @@ function parseArgs() {
 
 // ── 登录态管理 ───────────────────────────────────────
 
+/**
+ * 从 Cookie 列表中提取 csrf_token 和 corp_id
+ * - csrf_token：name="tianshu_csrf_token" 的 cookie value
+ * - corp_id：name="tianshu_corp_user" 的 cookie value，格式 "{corpId}_{userId}"，按最后一个 "_" 分隔
+ */
+function extractInfoFromCookies(cookies) {
+  let csrfToken = null;
+  let corpId = null;
+  for (const cookie of cookies) {
+    if (cookie.name === "tianshu_csrf_token") {
+      csrfToken = cookie.value;
+    } else if (cookie.name === "tianshu_corp_user") {
+      const lastUnderscore = cookie.value.lastIndexOf("_");
+      if (lastUnderscore > 0) {
+        corpId = cookie.value.slice(0, lastUnderscore);
+      }
+    }
+  }
+  return { csrfToken, corpId };
+}
+
 function loadCookieData() {
   if (!fs.existsSync(COOKIE_FILE)) return null;
   try {
     const raw = fs.readFileSync(COOKIE_FILE, "utf-8").trim();
     if (!raw) return null;
     const parsed = JSON.parse(raw);
+    let cookieData;
     if (Array.isArray(parsed)) {
-      return { cookies: parsed, base_url: DEFAULT_BASE_URL, csrf_token: "" };
+      cookieData = { cookies: parsed, base_url: DEFAULT_BASE_URL };
+    } else {
+      cookieData = parsed;
     }
-    return parsed;
+    // 从 Cookie 中提取 csrf_token 和 corp_id（优先使用 Cookie 中的值）
+    if (cookieData.cookies && cookieData.cookies.length > 0) {
+      const { csrfToken, corpId } = extractInfoFromCookies(cookieData.cookies);
+      if (csrfToken) cookieData.csrf_token = csrfToken;
+      if (corpId) cookieData.corp_id = corpId;
+    }
+    return cookieData;
   } catch {
     return null;
   }
@@ -117,11 +147,43 @@ function resolveBaseUrl(cookieData) {
   return ((cookieData && cookieData.base_url) || DEFAULT_BASE_URL).replace(/\/+$/, "");
 }
 
-function isLoginRedirect(statusCode, locationHeader) {
-  if (statusCode !== 301 && statusCode !== 302) return false;
-  if (!locationHeader) return true;
-  const loc = locationHeader.toLowerCase();
-  return loc.includes("login") || loc.includes("sso") || loc.includes("workplatform") || loc.includes("sign");
+/**
+ * 检测响应体是否表示登录过期
+ * 登录过期响应：{"success":false,"errorCode":"307","errorMsg":"登录状态已过期，请刷新页面后重新访问"}
+ */
+function isLoginExpired(responseJson) {
+  return responseJson && responseJson.success === false && responseJson.errorCode === "307";
+}
+
+/**
+ * 检测响应体是否表示 csrf_token 过期
+ * csrf 过期响应：{"success":false,"errorCode":"TIANSHU_000030","errorMsg":"csrf校验失败"}
+ */
+function isCsrfTokenExpired(responseJson) {
+  return responseJson && responseJson.success === false && responseJson.errorCode === "TIANSHU_000030";
+}
+
+function refreshCsrfToken() {
+  console.error("\n🔄 csrf_token 已过期，正在刷新...\n");
+  if (!fs.existsSync(LOGIN_SCRIPT)) {
+    console.error(`  ❌ 登录脚本不存在: ${LOGIN_SCRIPT}`);
+    process.exit(1);
+  }
+  const stdout = execSync(`python3 "${LOGIN_SCRIPT}" --refresh-csrf`, {
+    encoding: "utf-8",
+    stdio: ["inherit", "pipe", "inherit"],
+    timeout: 60_000,
+  });
+  const lines = stdout.trim().split("\n");
+  const jsonLine = lines[lines.length - 1];
+  try {
+    const result = JSON.parse(jsonLine);
+    if (!result.csrf_token || !result.cookies) throw new Error("刷新结果缺少 csrf_token 或 cookies");
+    return result;
+  } catch (err) {
+    console.error(`  ❌ 解析刷新结果失败: ${err.message}`);
+    process.exit(1);
+  }
 }
 
 // ── 发送请求（支持 302 自动重登录） ──────────────────
@@ -160,24 +222,31 @@ function sendRequest(baseUrl, csrfToken, cookies, appType, pageName) {
     console.error("  发送 saveFormSchemaInfo 请求...");
 
     const request = requestModule.request(requestOptions, (response) => {
-      // 检测到登录重定向，返回特殊标记
-      if (isLoginRedirect(response.statusCode, response.headers.location)) {
-        console.error(`  HTTP ${response.statusCode} → 检测到登录重定向`);
-        resolve({ __needLogin: true });
-        response.resume();
-        return;
-      }
-
       let responseData = "";
       response.on("data", (chunk) => { responseData += chunk; });
       response.on("end", () => {
         console.error(`  HTTP 状态码: ${response.statusCode}`);
+        let parsed;
         try {
-          resolve(JSON.parse(responseData));
+          parsed = JSON.parse(responseData);
         } catch (parseError) {
           console.error(`  响应内容: ${responseData.substring(0, 500)}`);
           resolve({ success: false, errorMsg: `HTTP ${response.statusCode}: 响应非 JSON` });
+          return;
         }
+        // 检测登录过期（errorCode: "307"）
+        if (isLoginExpired(parsed)) {
+          console.error(`  检测到登录过期: ${parsed.errorMsg}`);
+          resolve({ __needLogin: true });
+          return;
+        }
+        // 检测 csrf_token 过期（errorCode: "TIANSHU_000030"）
+        if (isCsrfTokenExpired(parsed)) {
+          console.error(`  检测到 csrf_token 过期: ${parsed.errorMsg}`);
+          resolve({ __csrfExpired: true });
+          return;
+        }
+        resolve(parsed);
       });
     });
 
@@ -216,9 +285,18 @@ async function main() {
   let baseUrl = resolveBaseUrl(cookieData);
   console.error(`  ✅ 登录态已就绪（${baseUrl}）`);
 
-  // Step 2: 创建自定义页面（302 时自动重登录重试）
+  // Step 2: 创建自定义页面（302 时自动重登录，307 时刷新 csrf_token 后重试）
   console.error("\n📄 Step 2: 创建自定义页面\n");
   let response = await sendRequest(baseUrl, csrfToken, cookies, appType, pageName);
+
+  if (response && response.__csrfExpired) {
+    cookieData = refreshCsrfToken();
+    csrfToken = cookieData.csrf_token;
+    cookies = cookieData.cookies;
+    baseUrl = resolveBaseUrl(cookieData);
+    console.error("  🔄 重新发送 saveFormSchemaInfo 请求（csrf_token 已刷新）...");
+    response = await sendRequest(baseUrl, csrfToken, cookies, appType, pageName);
+  }
 
   if (response && response.__needLogin) {
     cookieData = triggerLogin();
@@ -244,7 +322,7 @@ async function main() {
   } else {
     const errorMsg = response ? response.errorMsg || "未知错误" : "请求失败";
     console.error(`  ❌ 创建失败: ${errorMsg}`);
-    if (response && !response.__needLogin) {
+    if (response && !response.__needLogin && !response.__csrfExpired) {
       console.error(`  响应详情: ${JSON.stringify(response, null, 2)}`);
     }
     console.error("=".repeat(50));
