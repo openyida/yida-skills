@@ -34,11 +34,6 @@ const path = require("path");
 const querystring = require("querystring");
 
 const {
-  findProjectRoot,
-  PROJECT_ROOT,
-  DEFAULT_BASE_URL,
-  COOKIE_FILE,
-  extractInfoFromCookies,
   loadCookieData,
   resolveBaseUrl,
   isLoginExpired,
