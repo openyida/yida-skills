@@ -154,24 +154,13 @@ node --check skills/*/scripts/*.js
 
 ### 贡献者
 
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
-<table>
-  <tbody>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/yize"><img src="https://avatars.githubusercontent.com/u/1578814?v=4?s=100" width="100px;" alt="九神"/><br /><sub><b>九神</b></sub></a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/alexmm"><img src="https://avatars.githubusercontent.com/u/324539017?v=4?s=100" width="100px;" alt="天晟"/><br /><sub><b>天晟</b></sub></a></td>
-    </tr>
-  </tbody>
-</table>
+Thanks to all contributors:
 
-<!-- markdownlint-restore -->
-<!-- prettier-ignore-end -->
+<p align="left">
+  <a href="https://github.com/yize"><img src="https://avatars.githubusercontent.com/u/1578814?v=4&s=48" width="48" height="48" alt="九神" title="九神"/></a> <a href="https://github.com/alexmm"><img src="https://avatars.githubusercontent.com/u/324539017?v=4&s=48" width="48" height="48" alt="天晟" title="天晟"/></a>
+</p>
 
-<!-- ALL-CONTRIBUTORS-LIST:END -->
-
-感谢所有贡献者！
+欢迎提交 PR！一起完善宜搭 AI 技能库。
 
 ---
 
