@@ -31,22 +31,22 @@ COOKIE_FILE = os.path.join(find_project_root(SCRIPT_DIR), ".cache", "cookies.jso
 
 
 def main():
-    print("=" * 50)
-    print("  yida-logout - 宜搭退出登录工具")
-    print("=" * 50)
-    print(f"\n  Cookie 文件: {COOKIE_FILE}")
+    print("=" * 50, file=sys.stderr)
+    print("  yida-logout - 宜搭退出登录工具", file=sys.stderr)
+    print("=" * 50, file=sys.stderr)
+    print(f"\n  Cookie 文件: {COOKIE_FILE}", file=sys.stderr)
 
     if not os.path.exists(COOKIE_FILE):
-        print("\n  ℹ️  Cookie 文件不存在，无需清除。")
-        print("=" * 50)
+        print("\n  ℹ️  Cookie 文件不存在，无需清除。", file=sys.stderr)
+        print("=" * 50, file=sys.stderr)
         return
 
     with open(COOKIE_FILE, "w", encoding="utf-8") as file:
         file.write("")
 
-    print("\n  ✅ 已清空 Cookie，登录态已失效。")
-    print("  下次调用 yida-login 时将重新触发扫码登录。")
-    print("=" * 50)
+    print("\n  ✅ 已清空 Cookie，登录态已失效。", file=sys.stderr)
+    print("  下次调用 yida-login 时将重新触发扫码登录。", file=sys.stderr)
+    print("=" * 50, file=sys.stderr)
 
 
 if __name__ == "__main__":

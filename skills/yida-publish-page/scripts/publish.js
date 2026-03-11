@@ -375,6 +375,7 @@ function sendSaveRequest(csrfToken, cookies, schemaContent, baseUrl, appType, fo
         Referer: `${baseUrl}/`,
         Cookie: cookieHeader,
       },
+      timeout: 30000,
     };
 
     const request = requestModule.request(requestOptions, (response) => {
@@ -404,6 +405,12 @@ function sendSaveRequest(csrfToken, cookies, schemaContent, baseUrl, appType, fo
         }
         resolve(parsed);
       });
+    });
+
+    request.on("timeout", () => {
+      console.error("  ❌ 请求超时");
+      request.destroy();
+      reject(new Error("请求超时"));
     });
 
     request.on("error", (requestError) => { reject(requestError); });
@@ -447,6 +454,7 @@ function sendUpdateConfigRequest(csrfToken, cookies, baseUrl, appType, formUuid,
         Referer: `${baseUrl}/`,
         Cookie: cookieHeader,
       },
+      timeout: 30000,
     };
 
     const request = requestModule.request(requestOptions, (response) => {
@@ -476,6 +484,12 @@ function sendUpdateConfigRequest(csrfToken, cookies, baseUrl, appType, formUuid,
         }
         resolve(parsed);
       });
+    });
+
+    request.on("timeout", () => {
+      console.error("  ❌ 请求超时");
+      request.destroy();
+      reject(new Error("请求超时"));
     });
 
     request.on("error", (requestError) => { reject(requestError); });
