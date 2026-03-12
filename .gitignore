@@ -26,3 +26,6 @@ package-lock.json
 # dev/*
 prd/*
 pages/*
+
+# test coverage
+coverage/
