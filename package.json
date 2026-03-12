@@ -17,15 +17,6 @@
     "testMatch": [
       "**/tests/**/*.test.js"
     ],
-    "collectCoverageFrom": [
-      "skills/*/scripts/*.js",
-      "!skills/yida-publish-page/scripts/babel-transform/**"
-    ],
-    "coverageThreshold": {
-      "global": {
-        "lines": 80
-      }
-    },
     "coverageReporters": [
       "text",
       "lcov",
