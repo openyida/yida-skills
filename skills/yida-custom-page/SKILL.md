@@ -309,6 +309,24 @@ if (inputEl) { inputEl.value = ""; }
 
 ## API 参考
 
+### ⚠️ 测试数据写入说明（重要）
+
+在自定义页面**开发阶段**，如需向表单写入测试数据以验证页面功能，**必须使用 `yida-seed-data` 技能**，不能通过 Node.js 直接发 HTTP 请求。
+
+**原因**：宜搭 `saveFormData` 接口在 `/alibaba/web/` 路径下返回 302 重定向，在 `/dingtalk/web/` 路径下返回 404，只能在已登录的浏览器上下文中通过 `fetch` 调用。
+
+```bash
+# 正确的测试数据写入方式
+python3 .claude/skills/yida-seed-data/scripts/seed-data.py \
+  --app-type APP_XXX \
+  --page-url "https://www.aliwork.com/APP_XXX/custom/FORM-YYY" \
+  --records '[{"formUuid":"FORM-AAA","label":"测试记录","data":{"fieldId_1":"值1","fieldId_2":100}}]'
+```
+
+> 详见 `yida-seed-data` 技能文档。
+
+---
+
 ### 表单数据操作
 
 通过 `this.utils.yida.<方法名>(params)` 调用，所有接口返回 Promise。

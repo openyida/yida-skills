@@ -315,6 +315,75 @@ node publish.js APP_XXX FORM-XXXXXX pages/src/xxx.js
 ### Step 7：输出访问链接并直接使用系统浏览器打开
 * 访问地址参考「宜搭应用 url 规则说明」
 
+---
+
+### Step 8：写入测试数据（按需）
+
+**当应用包含表单且需要验证数据读取/展示功能时**，使用 `yida-seed-data` 技能写入测试数据。
+
+> ⚠️ **重要约束**：宜搭表单数据**不能**通过 Node.js 直接发送 HTTP 请求写入（`/alibaba/web/` 路径返回 302，`/dingtalk/web/` 路径返回 404）。**必须**通过 Playwright 在已登录的浏览器上下文中调用 `window.fetch` 写入，这是唯一经过验证的正确方式。
+
+#### 8.1 准备测试数据
+
+根据 `.cache/<项目名>-schema.json` 中的 `formUuid` 和 `fieldId`，构造 records JSON：
+
+```json
+[
+  {
+    "formUuid": "FORM-XXX",
+    "label": "商品A",
+    "data": {
+      "node_xxx1": "商品A",
+      "node_xxx2": 99.9,
+      "node_xxx3": "分类A"
+    }
+  },
+  {
+    "formUuid": "FORM-YYY",
+    "label": "采购单001",
+    "data": {
+      "node_yyy1": "PO-001",
+      "node_yyy2": "供应商A",
+      "node_yyy3": 100
+    }
+  }
+]
+```
+
+#### 8.2 执行写入
+
+```bash
+python3 .claude/skills/yida-seed-data/scripts/seed-data.py \
+  --app-type <appType> \
+  --page-url "<已发布的自定义页面URL>" \
+  --records '<上方的JSON字符串>'
+```
+
+**示例**：
+
+```bash
+python3 .claude/skills/yida-seed-data/scripts/seed-data.py \
+  --app-type APP_XXX \
+  --page-url "https://www.aliwork.com/APP_XXX/custom/FORM-YYY" \
+  --records '[{"formUuid":"FORM-AAA","label":"商品A","data":{"node_xxx1":"商品A","node_xxx2":99.9}}]'
+```
+
+**输出示例**：
+```
+📋 准备写入 2 条记录到宜搭表单...
+🌐 打开页面: https://www.aliwork.com/APP_XXX/custom/FORM-YYY
+✅ 页面加载完成，开始写入数据...
+
+  ✅ 商品A
+  ✅ 采购单001
+
+==================================================
+✅ 写入完成：成功 2 条，失败 0 条
+==================================================
+```
+
+> 详见 `yida-seed-data` 技能文档。
+
 ## 快速参考
 
 ### 子技能一览
