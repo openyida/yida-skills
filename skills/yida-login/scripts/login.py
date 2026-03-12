@@ -1,8 +1,12 @@
+import io
 import json
 import os
 import sys
+import time
 from urllib.parse import urlparse
 
+import inquirer
+from PIL import Image
 from playwright.sync_api import sync_playwright
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -139,41 +143,242 @@ def try_cached_login(saved_cookies, saved_base_url):
 
     return csrf_token, corp_id, user_id, base_url, saved_cookies
 
-# ── 有头扫码登录 ──────────────────────────────────────
+# ── 二维码 ASCII 渲染 ────────────────────────────────
+
+def render_qrcode_from_image_bytes(image_bytes):
+    """
+    将二维码图片字节数据转换为 ASCII 字符画并打印到 stderr。
+
+    使用黑白像素映射：黑色像素（二维码模块）→ '██'，白色 → '  '。
+    先将图片缩小到适合 terminal 显示的尺寸（约 40 列），再逐像素输出。
+    """
+    image = Image.open(io.BytesIO(image_bytes)).convert("L")  # 转灰度
+
+    # 缩放到适合 terminal 的尺寸（宽度约 40 个"双字符"块）
+    terminal_width = 40
+    scale = terminal_width / image.width
+    new_width = terminal_width
+    new_height = int(image.height * scale * 0.55)  # 0.55 补偿字符高宽比
+    image = image.resize((new_width, new_height), Image.LANCZOS)
+
+    pixels = list(image.getdata())
+    lines = []
+    for row_index in range(new_height):
+        row_pixels = pixels[row_index * new_width:(row_index + 1) * new_width]
+        # 灰度 < 128 视为黑色（二维码模块），否则为白色（背景）
+        row_chars = "".join("  " if pixel > 128 else "██" for pixel in row_pixels)
+        lines.append(row_chars)
+
+    border = "─" * (new_width * 2)
+    print(f"\n┌{border}┐", file=sys.stderr)
+    for line in lines:
+        print(f"│{line}│", file=sys.stderr)
+    print(f"└{border}┘", file=sys.stderr)
+
+
+def fetch_qrcode_image_bytes(page):
+    """
+    从登录页面获取二维码图片字节数据。
+
+    优先尝试截取二维码元素截图；若元素不存在则截取整个页面。
+    支持的二维码容器选择器（按优先级）：
+      - canvas（钉钉扫码登录常用 canvas 渲染）
+      - img[src*="qrcode"]、img[src*="qr"]
+      - .qrcode-img、.login-qrcode、.qrcode
+    """
+    qrcode_selectors = [
+        "canvas",
+        "img[src*='qrcode']",
+        "img[src*='qr']",
+        ".qrcode-img",
+        ".login-qrcode img",
+        ".qrcode img",
+        ".qrcode",
+    ]
+    for selector in qrcode_selectors:
+        element = page.query_selector(selector)
+        if element:
+            return element.screenshot()
+
+    # 兜底：截取整个页面
+    return page.screenshot()
+
+
+# ── 组织选择交互 ──────────────────────────────────────
+
+def select_corp_interactively(page):
+    """
+    当页面出现组织选择列表（.module-corp-sel-list）时，
+    提取所有组织名称，通过 inquirer 交互式列表让用户选择，
+    然后点击对应的组织元素完成登录。
+    """
+    print("\n\n🏢 检测到多个组织，请选择要登录的组织：", file=sys.stderr)
+
+    # 获取所有组织列表项
+    corp_items = page.query_selector_all(".module-corp-sel-list li")
+    if not corp_items:
+        # 兜底：尝试其他常见选择器
+        corp_items = page.query_selector_all(".corp-list li, .org-list li, [class*='corp'] li")
+
+    if not corp_items:
+        print("  ⚠️  无法获取组织列表，尝试点击第一个可见组织...", file=sys.stderr)
+        first_item = page.query_selector(".module-corp-sel-list, .corp-list")
+        if first_item:
+            first_item.click()
+        return
+
+    # 提取组织名称（过滤空文本）
+    corp_names = []
+    for item in corp_items:
+        name = (item.inner_text() or "").strip()
+        if name:
+            corp_names.append(name)
+
+    if not corp_names:
+        print("  ⚠️  组织列表为空，跳过选择。", file=sys.stderr)
+        return
+
+    # 用 inquirer 交互式选择
+    questions = [
+        inquirer.List(
+            "corp",
+            message="请选择登录组织（↑↓ 选择，Enter 确认）",
+            choices=corp_names,
+        )
+    ]
+    answers = inquirer.prompt(questions, render=inquirer.render.console.ConsoleRender())
+    if not answers:
+        print("  ⚠️  未选择组织，退出。", file=sys.stderr)
+        sys.exit(1)
+
+    selected_name = answers["corp"]
+    print(f"\n  ✅ 已选择组织：{selected_name}", file=sys.stderr)
+
+    # 点击对应的组织元素
+    for item in corp_items:
+        if (item.inner_text() or "").strip() == selected_name:
+            item.click()
+            return
+
+    print(f"  ⚠️  未找到组织「{selected_name}」的点击元素，尝试按索引点击...", file=sys.stderr)
+    index = corp_names.index(selected_name)
+    corp_items[index].click()
+
+
+# ── 无头扫码登录（Terminal 模式） ─────────────────────
 
 def interactive_login():
     """
-    打开有头浏览器让用户扫码登录。
+    以 headless 模式运行浏览器，在 terminal 中渲染二维码供用户扫码登录。
 
-    登录成功后直接从 Cookie 中提取 csrf_token、corpId、userId，
-    无需跳转 /myApp。
+    流程：
+    1. headless 模式打开登录页
+    2. 自动勾选"自动登录"复选框（若存在）
+    3. 截取二维码图片，转 ASCII 渲染到 terminal
+    4. 轮询检测二维码刷新，自动重新渲染
+    5. 若出现组织选择列表，交互式询问用户选择
+    6. 等待登录完成，提取 Cookie
 
     Returns:
         (csrf_token, corp_id, user_id, base_url, cookies) 元组
     """
-    print("\n🔐 正在打开浏览器，请扫码登录...", file=sys.stderr)
+    print("\n🔐 正在启动无头浏览器，准备渲染二维码...", file=sys.stderr)
+
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=False)
-        context = browser.new_context()
+        browser = pw.chromium.launch(headless=True)
+        context = browser.new_context(viewport={"width": 1280, "height": 800})
         page = context.new_page()
-        page.goto(LOGIN_URL, timeout=120_000)
 
-        print("  等待登录完成（最长等待 10 分钟）...", file=sys.stderr)
+        print(f"  正在加载登录页面: {LOGIN_URL}", file=sys.stderr)
+        page.goto(LOGIN_URL, timeout=60_000)
+        page.wait_for_load_state("domcontentloaded")
+
+        # ── 自动勾选"自动登录"复选框 ──────────────────
+        auto_login_selectors = [
+            "input[type='checkbox']",
+            ".auto-login input",
+            "[class*='auto'] input[type='checkbox']",
+            "label:has-text('自动登录') input",
+            "label:has-text('自动登录')",
+        ]
+        for selector in auto_login_selectors:
+            try:
+                checkbox = page.query_selector(selector)
+                if checkbox:
+                    is_checked = checkbox.is_checked() if checkbox.get_attribute("type") == "checkbox" else False
+                    if not is_checked:
+                        checkbox.click()
+                        print("  ✅ 已勾选「自动登录」", file=sys.stderr)
+                    else:
+                        print("  ✅ 「自动登录」已勾选", file=sys.stderr)
+                    break
+            except Exception:
+                continue
+
+        # ── 渲染二维码 ────────────────────────────────
+        print("\n📱 请使用钉钉扫描以下二维码登录：\n", file=sys.stderr)
         try:
-            page.wait_for_url("**/workPlatform**", timeout=600_000)
-        except Exception:
-            print("  ⏰ 登录超时（10分钟），请重试。", file=sys.stderr)
-            browser.close()
-            sys.exit(1)
+            qrcode_bytes = fetch_qrcode_image_bytes(page)
+            render_qrcode_from_image_bytes(qrcode_bytes)
+            print("\n  ⏳ 等待扫码中（二维码有效期约 3 分钟）...", file=sys.stderr)
+        except Exception as render_error:
+            print(f"  ⚠️  二维码渲染失败: {render_error}", file=sys.stderr)
+            print("  请手动打开浏览器访问登录页面扫码。", file=sys.stderr)
 
-        page.wait_for_load_state("networkidle")
-        print("  ✅ 登录成功！", file=sys.stderr)
+        # ── 轮询：检测二维码刷新 & 组织选择 & 登录完成 ──
+        last_qrcode_bytes = qrcode_bytes if 'qrcode_bytes' in dir() else None
+        login_completed = False
+        corp_selected = False
+        deadline = time.time() + 600  # 最长等待 10 分钟
+
+        while time.time() < deadline:
+            current_url = page.url
+
+            # 检测是否已跳转到 workPlatform（登录完成）
+            if "workPlatform" in current_url or "workbench" in current_url.lower():
+                login_completed = True
+                break
+
+            # 检测组织选择列表
+            corp_list = page.query_selector(".module-corp-sel-list")
+            if corp_list and not corp_selected:
+                corp_selected = True
+                select_corp_interactively(page)
+                # 等待跳转
+                try:
+                    page.wait_for_url("**/workPlatform**", timeout=30_000)
+                    login_completed = True
+                    break
+                except Exception:
+                    pass
+
+            # 检测二维码是否刷新（每 5 秒检查一次）
+            try:
+                new_qrcode_bytes = fetch_qrcode_image_bytes(page)
+                if last_qrcode_bytes and new_qrcode_bytes != last_qrcode_bytes:
+                    print("\n\n🔄 二维码已刷新，请重新扫码：\n", file=sys.stderr)
+                    render_qrcode_from_image_bytes(new_qrcode_bytes)
+                    print("\n  ⏳ 等待扫码中...", file=sys.stderr)
+                    last_qrcode_bytes = new_qrcode_bytes
+            except Exception:
+                pass
+
+            time.sleep(5)
+
+        if not login_completed:
+            # 最后再检查一次 URL
+            if "workPlatform" not in page.url:
+                print("\n  ⏰ 登录超时（10分钟），请重试。", file=sys.stderr)
+                browser.close()
+                sys.exit(1)
+
+        page.wait_for_load_state("networkidle", timeout=15_000)
+        print("\n  ✅ 登录成功！", file=sys.stderr)
 
         # 获取登录后的实际域名（可能从 www 跳转到 ding）
         post_login_parsed = urlparse(page.url)
         base_url = f"{post_login_parsed.scheme}://{post_login_parsed.netloc}"
 
-        # 直接从 Cookie 中提取所需信息，无需跳转 /myApp
         cookies = context.cookies()
         browser.close()
 
