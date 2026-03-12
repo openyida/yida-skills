@@ -482,6 +482,49 @@ console.log('当前状态:', _customState);
 this.utils.toast({ title: '调试信息', type: 'info' });
 ```
 
+### 5. iframe 嵌入表单页面 URL 规范
+
+在自定义页面中通过 iframe 嵌入宜搭表单时，需要使用正确的 URL 格式：
+
+#### 场景一：嵌入表单提交页
+
+| 类型 | URL 格式 | 说明 |
+|------|----------|------|
+| 提交页 | `{base_url}/{appType}/submission/{formUuid}` | 用于新建表单数据 |
+
+**示例**：
+```javascript
+const formUrl = `https://www.aliwork.com/${appType}/submission/${formUuid}`;
+```
+
+#### 场景二：嵌入表单数据列表（数据管理页面）
+
+| 类型 | URL 格式 | 说明 |
+|------|----------|------|
+| 数据管理页（iframe嵌入） | `{base_url}/{appType}/workbench/{formUuid}?viewUuid={viewUuid}&iframe=true` | **必须使用 workbench 路径**，viewUuid 用于指定多视图（可选） |
+
+**示例**：
+```javascript
+// 嵌入默认视图
+const listUrl = `https://www.aliwork.com/${appType}/workbench/${formUuid}?iframe=true`;
+
+// 嵌入指定多视图
+const viewUuid = "VIEW-DA556BB8FE1348FE904F55A247D645E5";
+const listUrlWithView = `https://www.aliwork.com/${appType}/workbench/${formUuid}?viewUuid=${viewUuid}&iframe=true`;
+```
+
+**重要提示**：
+- ❌ 错误：`{base_url}/{appType}/formDetail/{formUuid}` - 这是表单详情页，不是数据列表
+- ✅ 正确：`{base_url}/{appType}/workbench/{formUuid}?iframe=true` - 使用运行态的 workbench 地址
+- `viewUuid` 参数可选，用于指定多视图
+
+#### 获取 viewUuid 的方法（可选）
+
+1. 打开宜搭表单 → 点击「数据管理」
+2. 创建报表视图，配置需要的字段和筛选条件
+3. 创建完成后，访问该报表页面的 URL，从 URL 中提取 `viewUuid` 参数值
+4. 如果不传 viewUuid，默认使用第一个视图
+
 ---
 
 ## 参考资料
