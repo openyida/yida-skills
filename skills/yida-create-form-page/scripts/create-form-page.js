@@ -267,6 +267,8 @@ function readFieldsDefinition(fieldsJsonOrFile) {
   // 判断是 JSON 字符串还是文件路径
   if (fieldsJsonOrFile.trimStart().startsWith("[")) {
     rawContent = fieldsJsonOrFile;
+  } else if (fieldsJsonOrFile.trimStart().startsWith("{")) {
+    rawContent = fieldsJsonOrFile;
   } else {
     var resolvedPath = path.resolve(fieldsJsonOrFile);
     if (!fs.existsSync(resolvedPath)) {
@@ -277,11 +279,28 @@ function readFieldsDefinition(fieldsJsonOrFile) {
   }
 
   try {
-    const fields = JSON.parse(rawContent);
+    const parsed = JSON.parse(rawContent);
+    
+    // 支持两种格式：
+    // 1. 数组格式: [{type: "TextField", label: "姓名"}, ...]
+    // 2. 对象格式: { columns: 2, fields: [{type: "TextField", label: "姓名"}, ...] }
+    let fields;
+    let columns = 1; // 默认单列
+    
+    if (Array.isArray(parsed)) {
+      fields = parsed;
+    } else if (typeof parsed === "object" && parsed !== null) {
+      fields = parsed.fields || [];
+      columns = parsed.columns !== undefined ? parsed.columns : 1;
+    } else {
+      throw new Error("字段定义格式不正确");
+    }
+    
     if (!Array.isArray(fields) || fields.length === 0) {
       throw new Error("字段定义必须是非空数组");
     }
-    return fields;
+    
+    return { fields, columns };
   } catch (parseError) {
     console.error("  ❌ 解析字段定义失败: " + parseError.message);
     process.exit(1);
@@ -1093,7 +1112,8 @@ function resolveFieldIdReferences(fieldComponents) {
 
 // ── 生成表单 Schema ──────────────────────────────────
 
-function buildFormSchema(formTitle, fields, formUuid, corpId, appType) {
+function buildFormSchema(formTitle, fields, formUuid, corpId, appType, columns) {
+  columns = columns || 1;
   const fieldComponents = fields.map(function (field) {
     return buildFieldComponent(field);
   });
@@ -1222,7 +1242,7 @@ function buildFormSchema(formTitle, fields, formUuid, corpId, appType) {
               props: {
                 formLabel: i18n(formTitle, formTitle),
                 formLabelVisible: true,
-                columns: 1,
+                columns: columns,
                 labelAlign: "top",
                 submitText: i18n("提交", "Submit"),
                 stageText: i18n("暂存", "Stage"),
@@ -2071,8 +2091,9 @@ async function mainCreate(parsedArgs, csrfToken, cookies, baseUrl, cookieData) {
 
   // Step 2: 读取字段定义
   console.error("\n📋 Step 2: 读取字段定义");
-  const fields = readFieldsDefinition(fieldsJsonOrFile);
+  const { fields, columns } = readFieldsDefinition(fieldsJsonOrFile);
   console.error("  ✅ 已读取 " + fields.length + " 个字段定义");
+  console.error("  PC端列数: " + columns);
   fields.forEach(function (field, index) {
     console.error("     " + (index + 1) + ". " + field.type + ": " + field.label);
   });
@@ -2106,7 +2127,7 @@ async function mainCreate(parsedArgs, csrfToken, cookies, baseUrl, cookieData) {
     console.error("  ✅ corpId: " + corpId);
   }
 
-  const schema = buildFormSchema(formTitle, fields, formUuid, corpId, appType);
+  const schema = buildFormSchema(formTitle, fields, formUuid, corpId, appType, columns);
   var { configResult } = await saveSchemaAndUpdateConfig(authRef, appType, formUuid, schema, 1, 4);
 
   // 输出结果
