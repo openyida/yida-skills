@@ -7,34 +7,46 @@ from playwright.sync_api import sync_playwright
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+
 def find_project_root(start_dir):
-    """从 start_dir 向上查找含 README.md 或 .git 的项目根目录。"""
     current = start_dir
     while True:
-        if os.path.exists(os.path.join(current, "README.md")) or os.path.isdir(os.path.join(current, ".git")):
+        has_readme = os.path.exists(os.path.join(current, "README.md"))
+        has_git = os.path.isdir(os.path.join(current, ".git"))
+        is_submodule = current.endswith(".claude/skills")
+
+        if (has_readme or has_git) and not is_submodule:
             return current
+
         parent = os.path.dirname(current)
         if parent == current:
             return start_dir
         current = parent
 
+
 PROJECT_ROOT = find_project_root(SCRIPT_DIR)
 CONFIG_FILE = os.path.join(PROJECT_ROOT, "config.json")
 COOKIE_FILE = os.path.join(PROJECT_ROOT, ".cache", "cookies.json")
+
 
 def load_config():
     """从项目根目录的 config.json 读取配置。"""
     if not os.path.exists(CONFIG_FILE):
         print(f"  ⚠️  config.json 不存在: {CONFIG_FILE}，使用默认值", file=sys.stderr)
-        return {"loginUrl": "https://www.aliwork.com/workPlatform", "defaultBaseUrl": "https://www.aliwork.com"}
+        return {
+            "loginUrl": "https://www.aliwork.com/workPlatform",
+            "defaultBaseUrl": "https://www.aliwork.com",
+        }
     with open(CONFIG_FILE, "r", encoding="utf-8") as file:
         return json.load(file)
+
 
 _config = load_config()
 LOGIN_URL = _config["loginUrl"]
 DEFAULT_BASE_URL = _config["defaultBaseUrl"]
 
 # ── Cookie 持久化 ─────────────────────────────────────
+
 
 def save_login_cache(cookies, base_url=None):
     """将 Cookie 和 base_url 一起保存到本地缓存文件。"""
@@ -45,6 +57,7 @@ def save_login_cache(cookies, base_url=None):
     with open(COOKIE_FILE, "w", encoding="utf-8") as file:
         json.dump(cache, file, ensure_ascii=False, indent=2)
     print(f"  Cookie 已保存到 {COOKIE_FILE}", file=sys.stderr)
+
 
 def load_login_cache():
     """
@@ -76,7 +89,9 @@ def load_login_cache():
 
     return None, None
 
+
 # ── 从 Cookie 列表中提取登录信息 ──────────────────────
+
 
 def extract_info_from_cookies(cookies):
     """
@@ -108,11 +123,13 @@ def extract_info_from_cookies(cookies):
             last_underscore = value.rfind("_")
             if last_underscore > 0:
                 corp_id = value[:last_underscore]
-                user_id = value[last_underscore + 1:]
+                user_id = value[last_underscore + 1 :]
 
     return csrf_token, corp_id, user_id
 
+
 # ── 验证本地缓存的 Cookie ─────────────────────────────
+
 
 def try_cached_login(saved_cookies, saved_base_url):
     """
@@ -139,7 +156,9 @@ def try_cached_login(saved_cookies, saved_base_url):
 
     return csrf_token, corp_id, user_id, base_url, saved_cookies
 
+
 # ── 有头扫码登录 ──────────────────────────────────────
+
 
 def interactive_login():
     """
@@ -180,7 +199,9 @@ def interactive_login():
     csrf_token, corp_id, user_id = extract_info_from_cookies(cookies)
 
     if not csrf_token:
-        print("  ❌ 登录成功但 Cookie 中无 tianshu_csrf_token，请重试。", file=sys.stderr)
+        print(
+            "  ❌ 登录成功但 Cookie 中无 tianshu_csrf_token，请重试。", file=sys.stderr
+        )
         sys.exit(1)
 
     print(f"  ✅ csrf_token: {csrf_token[:16]}...", file=sys.stderr)
@@ -192,7 +213,9 @@ def interactive_login():
     save_login_cache(cookies, base_url)
     return csrf_token, corp_id, user_id, base_url, cookies
 
+
 # ── 核心入口 ──────────────────────────────────────────
+
 
 def ensure_login():
     """
@@ -214,7 +237,9 @@ def ensure_login():
 
     return interactive_login()
 
+
 # ── 刷新 csrf_token（TIANSHU_000030 场景） ────────────
+
 
 def refresh_csrf_token():
     """
@@ -244,7 +269,9 @@ def refresh_csrf_token():
     print(f"  ✅ csrf_token 提取成功: {csrf_token[:16]}...", file=sys.stderr)
     return csrf_token, corp_id, user_id, base_url, saved_cookies
 
+
 # ── CLI 入口 ──────────────────────────────────────────
+
 
 def main():
     # 支持 --refresh-csrf 模式：仅重新提取 csrf_token，不重新扫码登录
@@ -279,6 +306,7 @@ def main():
         "cookies": cookies,
     }
     print(json.dumps(output, ensure_ascii=False))
+
 
 if __name__ == "__main__":
     main()
