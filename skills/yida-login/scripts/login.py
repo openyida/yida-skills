@@ -253,6 +253,94 @@ def interactive_login():
     return csrf_token, corp_id, user_id, base_url, cookies
 
 
+# ── 终端 ASCII 二维码登录 ─────────────────────────────
+
+
+def qrcode_login():
+    """在终端显示 ASCII 二维码，供用户扫码登录。"""
+    print("\n📱 正在获取登录二维码...", file=sys.stderr)
+
+    import qrcode
+    import time
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        context = browser.new_context()
+        page = context.new_page()
+
+        qr_url = None
+
+        def handle_response(response):
+            nonlocal qr_url
+            url = response.url
+            if "generate_qrcode" in url or "/generate_qrcode?" in url:
+                print(f"  Found QR API: {url[:60]}", file=sys.stderr)
+                try:
+                    data = response.json()
+                    print(f"  Response: {data}", file=sys.stderr)
+                    if data.get("success") and data.get("result"):
+                        qr_url = data["result"]
+                except Exception as e:
+                    print(f"  Error: {e}", file=sys.stderr)
+
+        page.on("response", handle_response)
+
+        dingtalk_login_url = "https://login.dingtalk.com/oauth2/challenge.htm?redirect_uri=https%3A%2F%2Fwww.aliwork.com%2Fdingtalk_sso_call_back%3Fcontinue%3Dhttps%253A%252F%252Fwww.aliwork.com%252FworkPlatform&response_type=code&client_id=suite9xvlxxerybljwheo&scope=openid+corpid&lang=zh_CN"
+        page.goto(dingtalk_login_url, timeout=120_000)
+
+        for _ in range(20):
+            if qr_url:
+                break
+            time.sleep(0.5)
+
+        if not qr_url:
+            print("  ❌ 无法获取二维码", file=sys.stderr)
+            browser.close()
+            sys.exit(1)
+
+        print(f"  ✅ 二维码获取成功\n", file=sys.stderr)
+
+        qr = qrcode.QRCode(version=1, box_size=1, border=1)
+        qr.add_data(qr_url)
+        qr.make(fit=True)
+
+        print("─" * 40, file=sys.stderr)
+        print("  请使用钉钉扫码登录", file=sys.stderr)
+        print("─" * 40 + "\n", file=sys.stderr)
+
+        qr.print_ascii(tty=True)
+
+        print("\n" + "─" * 40, file=sys.stderr)
+        print("  等待扫码登录（最长 10 分钟）...", file=sys.stderr)
+
+        start_time = time.time()
+        while time.time() - start_time < 600:
+            if "workPlatform" in page.url:
+                break
+            time.sleep(2)
+
+        if "workPlatform" not in page.url:
+            print("  ⏰ 登录超时", file=sys.stderr)
+            browser.close()
+            sys.exit(1)
+
+        page.wait_for_load_state("networkidle")
+        print("  ✅ 登录成功！", file=sys.stderr)
+
+        post_login_parsed = urlparse(page.url)
+        base_url = f"{post_login_parsed.scheme}://{post_login_parsed.netloc}"
+        cookies = context.cookies()
+        browser.close()
+
+    csrf_token, corp_id, user_id = extract_info_from_cookies(cookies)
+    if not csrf_token:
+        print("  ❌ 登录成功但无 csrf_token", file=sys.stderr)
+        sys.exit(1)
+
+    save_login_cache(cookies, base_url)
+    return csrf_token, corp_id, user_id, base_url, cookies
+
+
 # ── 核心入口 ──────────────────────────────────────────
 
 
@@ -324,6 +412,13 @@ def main():
         print("=" * 50, file=sys.stderr)
 
         csrf_token, corp_id, user_id, base_url, cookies = refresh_csrf_token()
+    elif "--qrcode" in sys.argv:
+        print("=" * 50, file=sys.stderr)
+        print("  yida-login - 终端二维码登录", file=sys.stderr)
+        print("=" * 50, file=sys.stderr)
+        print(f"\n  登录地址: {LOGIN_URL}", file=sys.stderr)
+
+        csrf_token, corp_id, user_id, base_url, cookies = qrcode_login()
     else:
         print("=" * 50, file=sys.stderr)
         print("  yida-login - 宜搭登录态管理工具", file=sys.stderr)
