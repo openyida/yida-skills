@@ -388,7 +388,7 @@ this.utils.yida.searchFormDatas({
 | `previewImage` | 图片预览 | 图片查看、多图轮播 |
 | `loadScript` | 动态加载脚本 | 引入第三方库（如二维码生成） |
 
-完整参数说明和示例请参考 [yida-api.md](reference/yida-api.md) 的「工具类 API」章节。 |
+完整参数说明和示例请参考 [yida-api.md](../../shared/yida-api.md) 的「工具类 API」章节。 |
 
 ## 工具链
 
