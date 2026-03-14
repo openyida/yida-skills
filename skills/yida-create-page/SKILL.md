@@ -116,7 +116,9 @@ yida-create-page/
 
 1. **创建应用** → 使用 `yida-create-app` 技能获取 `appType`
 2. **创建自定义页面** → 本技能，获取 `pageId`（formUuid）
-3. **编写 JSX 源码** → 参考 `yida` 技能的开发规范
-4. **部署页面代码** → 使用 `yida-publish` 技能将代码部署到该页面
+3. **编写 JSX 源码** → **必须先加载 `yida-custom-page` skill**，严格按照其开发规范编写代码
+4. **部署页面代码** → 使用 `yida-publish-page` 技能将代码部署到该页面
+
+> ⚠️ **重要警告**：宜搭自定义页面使用类组件模式，**禁止使用 React Hooks**（useState/useEffect）。编写代码前必须先加载 `yida-custom-page` skill 查看完整的开发规范。
 
 > **提示**：如果需要创建的是表单页面（带字段的数据收集页），请使用 `yida-create-form-page` 技能。

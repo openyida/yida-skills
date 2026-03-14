@@ -9,7 +9,6 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def find_project_root(start_dir):
-    """从 start_dir 向上查找含 README.md 或 .git 的项目根目录。"""
     current = start_dir
     while True:
         if os.path.exists(os.path.join(current, "README.md")) or os.path.isdir(
@@ -254,183 +253,6 @@ def interactive_login():
     return csrf_token, corp_id, user_id, base_url, cookies
 
 
-# ── 终端 ASCII 二维码登录 ─────────────────────────────
-
-
-def qrcode_login():
-    """在终端显示二维码，供用户扫码登录。"""
-    print("\n📱 正在获取登录二维码...", file=sys.stderr)
-
-    import time
-    import os
-
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
-
-        qr_url = [None]
-        qr_response_body = [None]
-
-        def handle_response(response):
-            if qr_url[0]:
-                return
-            if "generate_qrcode" in response.url:
-                try:
-                    qr_response_body[0] = response.body()
-                except:
-                    pass
-
-        page.on("response", handle_response)
-
-        dingtalk_login_url = "https://login.dingtalk.com/oauth2/challenge.htm?redirect_uri=https%3A%2F%2Fwww.aliwork.com%2Fdingtalk_sso_call_back%3Fcontinue%3Dhttps%253A%252F%252Fwww.aliwork.com%252FworkPlatform&response_type=code&client_id=suite9xvlxxerybljwheo&scope=openid+corpid&lang=zh_CN"
-        page.goto(dingtalk_login_url, timeout=120_000)
-        page.wait_for_selector(".module-qrcode-code canvas", timeout=15000)
-        time.sleep(2)
-
-        # 解析响应获取二维码 URL
-        if qr_response_body[0]:
-            try:
-                import json
-
-                data = json.loads(qr_response_body[0])
-                if data.get("success") and data.get("result"):
-                    qr_url[0] = data["result"]
-            except:
-                pass
-
-        if not qr_url[0]:
-            print("  ❌ 无法获取二维码", file=sys.stderr)
-            browser.close()
-            sys.exit(1)
-
-        print(f"  ✅ 获取成功: {qr_url[0][:40]}...\n", file=sys.stderr)
-
-        # 生成 PNG
-        import qrcode
-
-        qr = qrcode.QRCode(version=1, box_size=10, border=1)
-        qr.add_data(qr_url[0])
-        qr.make(fit=True)
-
-        qr_img = qr.make_image(fill_color="black", back_color="white")
-        qr_path = "/tmp/yida_login_qr.png"
-        qr_img.save(qr_path)
-
-        # 渲染到终端
-        render_terminal_qr(qr_path)
-
-        print("\n" + "─" * 40, file=sys.stderr)
-        print("  请扫码登录（最长 10 分钟）...", file=sys.stderr)
-
-        start_time = time.time()
-        while time.time() - start_time < 600:
-            if "workPlatform" in page.url:
-                break
-            time.sleep(2)
-
-        if "workPlatform" not in page.url:
-            print("  ⏰ 登录超时", file=sys.stderr)
-            browser.close()
-            sys.exit(1)
-
-        page.wait_for_load_state("networkidle")
-        print("  ✅ 登录成功！", file=sys.stderr)
-
-        post_login_parsed = urlparse(page.url)
-        base_url = f"{post_login_parsed.scheme}://{post_login_parsed.netloc}"
-        cookies = context.cookies()
-        browser.close()
-
-    csrf_token, corp_id, user_id = extract_info_from_cookies(cookies)
-    if not csrf_token:
-        print("  ❌ 登录成功但无 csrf_token", file=sys.stderr)
-        sys.exit(1)
-
-    save_login_cache(cookies, base_url)
-    return csrf_token, corp_id, user_id, base_url, cookies
-
-
-def detect_terminal_type():
-    """检测终端类型。"""
-    term = os.environ.get("TERM", "")
-    term_program = os.environ.get("TERM_PROGRAM", "")
-
-    if term_program in ("iTerm.app", "iTerm2"):
-        return "iterm2"
-    elif "kitty" in term:
-        return "kitty"
-    elif "wezterm" in term.lower():
-        return "wezterm"
-    elif "xterm" in term:
-        return "sixel"
-    else:
-        return "unknown"
-
-
-def render_terminal_qr(qr_path):
-    """根据终端类型渲染二维码。"""
-    term_type = detect_terminal_type()
-
-    try:
-        if term_type == "iterm2":
-            import base64
-
-            with open(qr_path, "rb") as f:
-                img_data = base64.b64encode(f.read()).decode()
-            print(
-                f"\033]1337;File=inline=1;width=20%;preserveAspectRatio=1:{img_data}\a\n"
-            )
-            return
-        elif term_type == "kitty":
-            import subprocess
-
-            subprocess.run(["kitty", "+launch", "--stdin", "cat", qr_path], check=False)
-            return
-        elif term_type == "wezterm":
-            import base64
-
-            with open(qr_path, "rb") as f:
-                img_data = base64.b64encode(f.read()).decode()
-            print(
-                f"\033]1337;File=inline=1;width=20%;preserveAspectRatio=1:{img_data}\a\n"
-            )
-            return
-    except Exception:
-        pass
-
-    try:
-        import subprocess
-
-        subprocess.run(["imgcat", qr_path], check=False, capture_output=True)
-        return
-    except:
-        pass
-
-    print("  ℹ️ 终端不支持图片，降级到 ASCII", file=sys.stderr)
-    render_ascii_qr(qr_path)
-
-
-def render_ascii_qr(qr_path):
-    """降级方案：ASCII 渲染。"""
-    try:
-        from PIL import Image
-        import numpy as np
-
-        img = Image.open(qr_path).convert("L")
-        img = img.resize((21, 21))
-        arr = np.array(img)
-        arr = arr > 128
-
-        print(file=sys.stderr)
-        for row in arr:
-            line = "".join("██" if cell else "  " for cell in row)
-            print(line, file=sys.stderr)
-        print(file=sys.stderr)
-    except Exception as e:
-        print(f"  ⚠️ ASCII 渲染失败: {e}", file=sys.stderr)
-
-
 # ── 核心入口 ──────────────────────────────────────────
 
 
@@ -495,19 +317,13 @@ def main():
         result = check_login_only()
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
-    elif "--refresh-csrf" in sys.argv:
+    # 支持 --refresh-csrf 模式：仅重新提取 csrf_token，不重新扫码登录
+    if "--refresh-csrf" in sys.argv:
         print("=" * 50, file=sys.stderr)
         print("  yida-login - csrf_token 刷新模式", file=sys.stderr)
         print("=" * 50, file=sys.stderr)
 
         csrf_token, corp_id, user_id, base_url, cookies = refresh_csrf_token()
-    elif "--qrcode" in sys.argv:
-        print("=" * 50, file=sys.stderr)
-        print("  yida-login - 终端二维码登录", file=sys.stderr)
-        print("=" * 50, file=sys.stderr)
-        print(f"\n  登录地址: {LOGIN_URL}", file=sys.stderr)
-
-        csrf_token, corp_id, user_id, base_url, cookies = qrcode_login()
     else:
         print("=" * 50, file=sys.stderr)
         print("  yida-login - 宜搭登录态管理工具", file=sys.stderr)

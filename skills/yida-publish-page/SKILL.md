@@ -158,5 +158,7 @@ yida-publish/
 ## 与其他技能配合
 
 - **`yida-login`**：登录态失效时自动调用（Cookie 持久化，首次或 302 时需扫码）
-- **`yida`**：编写源码后调用本技能发布
+- **`yida-custom-page`**：**编写源码前必须先加载此 skill**，严格按照其开发规范编写代码（禁止使用 React Hooks）
 - **`yida-app`**：完整应用开发流程的最后一步
+
+> ⚠️ **重要警告**：宜搭自定义页面使用类组件模式，**禁止使用 React Hooks**（useState/useEffect）。发布前必须确保代码已加载 `yida-custom-page` skill 并遵循其开发规范。
