@@ -258,61 +258,70 @@ def interactive_login():
 
 
 def qrcode_login():
-    """在终端显示 ASCII 二维码，供用户扫码登录。"""
+    """在终端显示二维码，供用户扫码登录。"""
     print("\n📱 正在获取登录二维码...", file=sys.stderr)
 
-    import qrcode
     import time
+    import os
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         context = browser.new_context()
         page = context.new_page()
 
-        qr_url = None
+        qr_url = [None]
+        qr_response_body = [None]
 
         def handle_response(response):
-            nonlocal qr_url
-            url = response.url
-            if "generate_qrcode" in url or "/generate_qrcode?" in url:
-                print(f"  Found QR API: {url[:60]}", file=sys.stderr)
+            if qr_url[0]:
+                return
+            if "generate_qrcode" in response.url:
                 try:
-                    data = response.json()
-                    print(f"  Response: {data}", file=sys.stderr)
-                    if data.get("success") and data.get("result"):
-                        qr_url = data["result"]
-                except Exception as e:
-                    print(f"  Error: {e}", file=sys.stderr)
+                    qr_response_body[0] = response.body()
+                except:
+                    pass
 
         page.on("response", handle_response)
 
         dingtalk_login_url = "https://login.dingtalk.com/oauth2/challenge.htm?redirect_uri=https%3A%2F%2Fwww.aliwork.com%2Fdingtalk_sso_call_back%3Fcontinue%3Dhttps%253A%252F%252Fwww.aliwork.com%252FworkPlatform&response_type=code&client_id=suite9xvlxxerybljwheo&scope=openid+corpid&lang=zh_CN"
         page.goto(dingtalk_login_url, timeout=120_000)
+        page.wait_for_selector(".module-qrcode-code canvas", timeout=15000)
+        time.sleep(2)
 
-        for _ in range(20):
-            if qr_url:
-                break
-            time.sleep(0.5)
+        # 解析响应获取二维码 URL
+        if qr_response_body[0]:
+            try:
+                import json
 
-        if not qr_url:
+                data = json.loads(qr_response_body[0])
+                if data.get("success") and data.get("result"):
+                    qr_url[0] = data["result"]
+            except:
+                pass
+
+        if not qr_url[0]:
             print("  ❌ 无法获取二维码", file=sys.stderr)
             browser.close()
             sys.exit(1)
 
-        print(f"  ✅ 二维码获取成功\n", file=sys.stderr)
+        print(f"  ✅ 获取成功: {qr_url[0][:40]}...\n", file=sys.stderr)
 
-        qr = qrcode.QRCode(version=1, box_size=1, border=1)
-        qr.add_data(qr_url)
+        # 生成 PNG
+        import qrcode
+
+        qr = qrcode.QRCode(version=1, box_size=10, border=1)
+        qr.add_data(qr_url[0])
         qr.make(fit=True)
 
-        print("─" * 40, file=sys.stderr)
-        print("  请使用钉钉扫码登录", file=sys.stderr)
-        print("─" * 40 + "\n", file=sys.stderr)
+        qr_img = qr.make_image(fill_color="black", back_color="white")
+        qr_path = "/tmp/yida_login_qr.png"
+        qr_img.save(qr_path)
 
-        qr.print_ascii(tty=True)
+        # 渲染到终端
+        render_terminal_qr(qr_path)
 
         print("\n" + "─" * 40, file=sys.stderr)
-        print("  等待扫码登录（最长 10 分钟）...", file=sys.stderr)
+        print("  请扫码登录（最长 10 分钟）...", file=sys.stderr)
 
         start_time = time.time()
         while time.time() - start_time < 600:
@@ -341,13 +350,85 @@ def qrcode_login():
     save_login_cache(cookies, base_url)
     return csrf_token, corp_id, user_id, base_url, cookies
 
-    csrf_token, corp_id, user_id = extract_info_from_cookies(cookies)
-    if not csrf_token:
-        print("  ❌ 登录成功但无 csrf_token", file=sys.stderr)
-        sys.exit(1)
 
-    save_login_cache(cookies, base_url)
-    return csrf_token, corp_id, user_id, base_url, cookies
+def detect_terminal_type():
+    """检测终端类型。"""
+    term = os.environ.get("TERM", "")
+    term_program = os.environ.get("TERM_PROGRAM", "")
+
+    if term_program in ("iTerm.app", "iTerm2"):
+        return "iterm2"
+    elif "kitty" in term:
+        return "kitty"
+    elif "wezterm" in term.lower():
+        return "wezterm"
+    elif "xterm" in term:
+        return "sixel"
+    else:
+        return "unknown"
+
+
+def render_terminal_qr(qr_path):
+    """根据终端类型渲染二维码。"""
+    term_type = detect_terminal_type()
+
+    try:
+        if term_type == "iterm2":
+            import base64
+
+            with open(qr_path, "rb") as f:
+                img_data = base64.b64encode(f.read()).decode()
+            print(
+                f"\033]1337;File=inline=1;width=20%;preserveAspectRatio=1:{img_data}\a\n"
+            )
+            return
+        elif term_type == "kitty":
+            import subprocess
+
+            subprocess.run(["kitty", "+launch", "--stdin", "cat", qr_path], check=False)
+            return
+        elif term_type == "wezterm":
+            import base64
+
+            with open(qr_path, "rb") as f:
+                img_data = base64.b64encode(f.read()).decode()
+            print(
+                f"\033]1337;File=inline=1;width=20%;preserveAspectRatio=1:{img_data}\a\n"
+            )
+            return
+    except Exception:
+        pass
+
+    try:
+        import subprocess
+
+        subprocess.run(["imgcat", qr_path], check=False, capture_output=True)
+        return
+    except:
+        pass
+
+    print("  ℹ️ 终端不支持图片，降级到 ASCII", file=sys.stderr)
+    render_ascii_qr(qr_path)
+
+
+def render_ascii_qr(qr_path):
+    """降级方案：ASCII 渲染。"""
+    try:
+        from PIL import Image
+        import numpy as np
+
+        img = Image.open(qr_path).convert("L")
+        img = img.resize((21, 21))
+        arr = np.array(img)
+        arr = arr > 128
+
+        print(file=sys.stderr)
+        for row in arr:
+            line = "".join("██" if cell else "  " for cell in row)
+            print(line, file=sys.stderr)
+        print(file=sys.stderr)
+    except Exception as e:
+        print(f"  ⚠️ ASCII 渲染失败: {e}", file=sys.stderr)
 
 
 # ── 核心入口 ──────────────────────────────────────────
