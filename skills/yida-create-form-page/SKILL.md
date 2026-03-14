@@ -544,6 +544,93 @@ yida-create-form-page/
 
 > **提示**：如果需要创建的是自定义展示页面（无字段，用于部署 JSX 代码），请使用 `yida-create-page` 技能。
 
+## 表单数据操作 API
+
+> 以下 API 用于在自定义页面或脚本中对表单数据进行增删改查，通过 `this.utils.yida.<方法名>(params)` 调用，所有接口返回 Promise。
+
+### saveFormData — 新建表单实例
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `formUuid` | String | 是 | 表单 UUID |
+| `appType` | String | 是 | 应用 ID |
+| `formDataJson` | String | 是 | 表单数据（JSON 字符串） |
+
+```javascript
+this.utils.yida.saveFormData({
+  formUuid: 'FORM-XXX',
+  appType: window.pageConfig.appType,
+  formDataJson: JSON.stringify({
+    textField_xxx: '单行文本',
+    numberField_xxx: 100,
+  }),
+}).then(function(res) {
+  console.log('新建成功，实例ID:', res.result);
+}).catch(function(err) {
+  console.error('新建失败:', err.message);
+});
+```
+
+### updateFormData — 更新表单实例
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `formInstId` | String | 是 | 表单实例 ID |
+| `updateFormDataJson` | String | 是 | 需要更新的字段（JSON 字符串） |
+
+```javascript
+this.utils.yida.updateFormData({
+  formInstId: 'FINST-XXX',
+  updateFormDataJson: JSON.stringify({ textField_xxx: '新值' }),
+});
+```
+
+### deleteFormData — 删除表单实例
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `formUuid` | String | 是 | 表单 UUID |
+| `formInstId` | String | 是 | 表单实例 ID |
+
+### getFormDataById — 查询单条实例详情
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `formInstId` | String | 是 | 表单实例 ID |
+
+### searchFormDatas — 按条件搜索实例列表
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `formUuid` | String | 是 | 表单 UUID |
+| `searchFieldJson` | String | 否 | 按字段值筛选（JSON 字符串） |
+| `currentPage` | Number | 否 | 当前页，默认 1 |
+| `pageSize` | Number | 否 | 每页记录数，默认 10，**最大 100** |
+
+```javascript
+this.utils.yida.searchFormDatas({
+  formUuid: 'FORM-XXX',
+  searchFieldJson: JSON.stringify({ textField_xxx: '查询值' }),
+  currentPage: 1,
+  pageSize: 10,
+}).then(function(res) {
+  // res.data: 实例列表，res.totalCount: 总数
+  console.log('查询结果:', res.data);
+});
+```
+
+### searchFormDataIds — 按条件搜索实例 ID 列表
+
+参数同 `searchFormDatas`，返回实例 ID 数组（适合批量操作场景）。
+
+### getFormComponentDefinationList — 获取表单字段定义
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `formUuid` | String | 是 | 表单 UUID |
+
+---
+
 ## 注意事项
 - **临时文件写在当前工程根目录的 .cache 文件夹中，如果没有就创建一个文件夹，注意不要写在系统的其他文件夹中**
 - update 模式中，修改定义 JSON 的操作按顺序执行，注意操作间的依赖关系（如先删后加）

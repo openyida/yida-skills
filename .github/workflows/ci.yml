@@ -8,7 +8,10 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
     - name: Checkout code
@@ -20,17 +23,13 @@ jobs:
         node-version: '20'
 
     - name: Validate JavaScript syntax
-      run: |
-        for file in skills/*/scripts/*.js; do
-          node --check "$file" || exit 1
-        done
+      run: node .github/scripts/validate-js-syntax.js
 
     - name: Validate JSON files
-      run: |
-        find . -name "*.json" -path "./skills/*" | while read -r file; do
-          node -e "JSON.parse(require('fs').readFileSync(process.argv[1]))" -- "$file" || exit 1
-          echo "  ✅ $file"
-        done
+      run: node .github/scripts/validate-json.js
+
+    - name: Validate SKILL.md integrity
+      run: node .github/scripts/validate-skill-md.js
 
     - name: Install test dependencies
       run: npm install
@@ -46,3 +45,42 @@ jobs:
 
     - name: Run tests with coverage
       run: npm run test:coverage
+
+  # ── 与 openyida 主项目的集成测试 ─────────────────────────────────────
+  # 验证当前 PR 的 yida-skills 代码装入 openyida 后，主项目测试套件仍能通过
+  integration-with-openyida:
+    name: Integration with openyida
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - name: Checkout yida-skills (current PR)
+      uses: actions/checkout@v4
+      with:
+        path: yida-skills
+
+    - name: Checkout openyida
+      uses: actions/checkout@v4
+      with:
+        repository: openyida/openyida
+        path: openyida
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Mount current yida-skills into openyida
+      # 用当前 PR 的代码替代 install-skills.sh 克隆的结果
+      # 模拟用户安装了这个版本的 yida-skills 后的真实状态
+      run: |
+        mkdir -p openyida/.claude/skills
+        cp -r yida-skills/. openyida/.claude/skills/
+
+    - name: Install openyida dependencies
+      run: npm install
+      working-directory: openyida
+
+    - name: Run openyida test suite
+      run: npm test
+      working-directory: openyida
