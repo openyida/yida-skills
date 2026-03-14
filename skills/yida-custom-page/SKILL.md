@@ -388,7 +388,7 @@ this.utils.yida.searchFormDatas({
 | `previewImage` | 图片预览 | 图片查看、多图轮播 |
 | `loadScript` | 动态加载脚本 | 引入第三方库（如二维码生成） |
 
-完整参数说明和示例请参考 [yida-api.md](../../shared/yida-api.md) 的「工具类 API」章节。 |
+完整参数说明和示例请参考 [yida-api.md](reference/yida-api.md) 的「工具类 API」章节。 |
 
 ## 工具链
 
@@ -534,5 +534,5 @@ const listUrlWithView = `https://www.aliwork.com/${appType}/workbench/${formUuid
 | --- | --- | --- |
 | 宜搭 JS API | `../../shared/yida-api.md` | 表单数据增删改查（7 个）、流程操作（6 个）、工具类 API（14 个），共 27 个 API 的完整参数与示例 |
 | 大模型 AI 接口 | `reference/model-api.md` | AI 文本生成接口的请求参数、返回值结构与调用示例 |
-| Schema 保存接口 | `reference/save-schema.md` | `saveFormSchema` 接口的请求参数与返回值 |
+| Schema 保存接口 | `../../shared/yida-api.md` | `saveFormSchema` 接口的请求参数与返回值，详见 shared/yida-api.md 的「表单数据操作」章节 |
 

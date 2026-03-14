@@ -32,6 +32,91 @@ jobs:
           echo "  ✅ $file"
         done
 
+    - name: Validate SKILL.md integrity
+      run: |
+        node - <<'EOF'
+        const fs = require('fs');
+        const path = require('path');
+
+        const skillsDir = path.join(process.cwd(), 'skills');
+        const errors = [];
+
+        // 跳过 shared 目录（不是 skill）
+        const SKIP_DIRS = new Set(['shared']);
+
+        const skillDirs = fs.readdirSync(skillsDir).filter(name => {
+          const fullPath = path.join(skillsDir, name);
+          return fs.statSync(fullPath).isDirectory() && !SKIP_DIRS.has(name);
+        });
+
+        for (const skillName of skillDirs) {
+          const skillDir = path.join(skillsDir, skillName);
+          const skillMdPath = path.join(skillDir, 'SKILL.md');
+
+          // 1. 检查 SKILL.md 是否存在
+          if (!fs.existsSync(skillMdPath)) {
+            errors.push(`❌ [${skillName}] 缺少 SKILL.md`);
+            continue;
+          }
+
+          const content = fs.readFileSync(skillMdPath, 'utf-8');
+
+          // 2. 检查 frontmatter 是否存在
+          if (!content.startsWith('---')) {
+            errors.push(`❌ [${skillName}] SKILL.md 缺少 frontmatter`);
+          }
+
+          // 3. 检查必要章节
+          if (!content.includes('## ')) {
+            errors.push(`❌ [${skillName}] SKILL.md 没有任何章节（## 标题）`);
+          }
+
+          // 判断路径是否应跳过检查：
+          // - 外部链接（http/https）
+          // - 占位符路径（含 < > 的模板变量，如 prd/<项目名>.md）
+          // - 纯文件名（不含路径分隔符，如 README.md，出现在描述文字中而非引用）
+          function shouldSkipPath(refPath) {
+            if (refPath.startsWith('http')) return true;
+            if (refPath.includes('<') || refPath.includes('>')) return true;
+            if (!refPath.includes('/') && !refPath.includes('\\')) return true;
+            return false;
+          }
+
+          // 4. 检查 Markdown 链接引用的文件是否存在
+          const linkPattern = /\[.*?\]\(([^)]+\.md)\)/g;
+          let match;
+          while ((match = linkPattern.exec(content)) !== null) {
+            const refPath = match[1];
+            if (shouldSkipPath(refPath)) continue;
+            const absPath = path.resolve(skillDir, refPath);
+            if (!fs.existsSync(absPath)) {
+              errors.push(`❌ [${skillName}] SKILL.md 引用了不存在的文件：${refPath}`);
+            }
+          }
+
+          // 5. 检查反引号路径引用的 .md 文件是否存在
+          const backtickPattern = /`([^`]*\.md)`/g;
+          while ((match = backtickPattern.exec(content)) !== null) {
+            const refPath = match[1];
+            if (shouldSkipPath(refPath)) continue;
+            const absPath = path.resolve(skillDir, refPath);
+            if (!fs.existsSync(absPath)) {
+              errors.push(`❌ [${skillName}] SKILL.md 引用了不存在的路径：${refPath}`);
+            }
+          }
+
+          console.log(`✅ ${skillName}`);
+        }
+
+        if (errors.length > 0) {
+          console.error('\n以下 SKILL.md 存在问题：');
+          errors.forEach(e => console.error(e));
+          process.exit(1);
+        }
+
+        console.log(`\n✅ 所有 ${skillDirs.length} 个 skill 的 SKILL.md 检查通过`);
+        EOF
+
     - name: Install test dependencies
       run: npm install
 
