@@ -399,6 +399,7 @@ this.utils.yida.searchFormDatas({
 | --- | --- | --- |
 | **yida-login** | 登录态管理（Cookie 持久化 + 扫码登录） | `python3 .claude/skills/yida-login/scripts/login.py` |
 | **yida-publish-page** | 编译源码 + 构建 Schema + 发布到宜搭 | `node .claude/skills/yida-publish-page/scripts/publish.js <appType> <formUuid> <源文件路径>` |
+| **yida-page-config** | 页面配置（URL 验证、公开访问/分享配置） | `node .claude/skills/yida-page-config/scripts/verify-short-url.js <appType> <formUuid> /o/xxx` |
 
 ### 编译 + 发布（一键完成）
 

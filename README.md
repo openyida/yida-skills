@@ -30,6 +30,7 @@
 | `yida-create-form-page` | 创建表单页面 | 支持 19 种字段类型的表单创建与更新 |
 | `yida-custom-page` | 自定义页面开发 | 宜搭 JSX 组件开发规范、JS API 调用、代码编译与 Schema 部署 |
 | `yida-publish-page` | 发布页面 | 将源码编译并部署 Schema 到宜搭平台 |
+| `yida-page-config` | 页面配置 | 公开访问/分享 URL 验证与配置、隐藏顶部导航等页面设置 |
 | `yida-app` | 完整应用开发 | 从零到一搭建完整宜搭应用的全流程编排（编排型技能，无独立脚本） |
 | `yida-get-schema` | 获取表单 Schema | 调用 getFormSchema 接口获取表单完整 Schema 结构 |
 
