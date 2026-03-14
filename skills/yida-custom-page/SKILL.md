@@ -306,6 +306,42 @@ var inputEl = document.getElementById("my-input");
 if (inputEl) { inputEl.value = ""; }
 ```
 
+9. **DateField 必须是时间戳格式**：保存日期字段时，值必须是 **时间戳（毫秒）**，不能是字符串。示例：
+```javascript
+// ❌ 错误：字符串格式
+dateField_xxx: '2024-01-15'
+
+// ✅ 正确：时间戳格式
+dateField_xxx: new Date().getTime()
+```
+
+10. **多端适配**：宜搭自定义页面会在 PC 端和移动端同时展示，样式需要兼容两种设备。使用 `this.utils.isMobile()` 判断设备类型，动态调整布局和样式：
+```javascript
+const isMobile = this.utils.isMobile();
+
+var styles = {
+  container: { 
+    padding: isMobile ? '12px' : '16px',  // 移动端padding更小
+    minHeight: '100vh'
+  },
+  card: {
+    padding: isMobile ? '12px' : '16px',   // 移动端更紧凑
+    marginBottom: isMobile ? '8px' : '12px'
+  }
+};
+```
+
+11. **清除默认 padding 和圆角**：宜搭自定义页面容器有默认 padding 和圆角，需要强制覆盖：
+```javascript
+var styles = {
+  container: { 
+    padding: '0 16px',
+    borderRadius: '0 !important',  // 清除默认圆角
+    minHeight: '100vh'
+  }
+};
+```
+
 ---
 
 ## API 参考

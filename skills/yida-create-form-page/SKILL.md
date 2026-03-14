@@ -556,6 +556,14 @@ yida-create-form-page/
 | `appType` | String | 是 | 应用 ID |
 | `formDataJson` | String | 是 | 表单数据（JSON 字符串） |
 
+> ⚠️ **注意**：DateField 字段的值必须是**时间戳（毫秒）**，不能是字符串。例如：
+> ```javascript
+> // ✅ 正确
+> dateField_xxx: new Date().getTime()
+> // ❌ 错误
+> dateField_xxx: '2024-01-15'
+> ```
+
 ```javascript
 this.utils.yida.saveFormData({
   formUuid: 'FORM-XXX',
@@ -577,6 +585,8 @@ this.utils.yida.saveFormData({
 | --- | --- | --- | --- |
 | `formInstId` | String | 是 | 表单实例 ID |
 | `updateFormDataJson` | String | 是 | 需要更新的字段（JSON 字符串） |
+
+> ⚠️ **注意**：DateField 字段的值必须是**时间戳（毫秒）**。
 
 ```javascript
 this.utils.yida.updateFormData({

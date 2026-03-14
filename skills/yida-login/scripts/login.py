@@ -9,7 +9,6 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def find_project_root(start_dir):
-    """从 start_dir 向上查找含 README.md 或 .git 的项目根目录。"""
     current = start_dir
     while True:
         if os.path.exists(os.path.join(current, "README.md")) or os.path.isdir(
@@ -341,14 +340,6 @@ def qrcode_login():
     save_login_cache(cookies, base_url)
     return csrf_token, corp_id, user_id, base_url, cookies
 
-    csrf_token, corp_id, user_id = extract_info_from_cookies(cookies)
-    if not csrf_token:
-        print("  ❌ 登录成功但无 csrf_token", file=sys.stderr)
-        sys.exit(1)
-
-    save_login_cache(cookies, base_url)
-    return csrf_token, corp_id, user_id, base_url, cookies
-
 
 # ── 核心入口 ──────────────────────────────────────────
 
@@ -414,7 +405,8 @@ def main():
         result = check_login_only()
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
-    elif "--refresh-csrf" in sys.argv:
+    # 支持 --refresh-csrf 模式：仅重新提取 csrf_token，不重新扫码登录
+    if "--refresh-csrf" in sys.argv:
         print("=" * 50, file=sys.stderr)
         print("  yida-login - csrf_token 刷新模式", file=sys.stderr)
         print("=" * 50, file=sys.stderr)

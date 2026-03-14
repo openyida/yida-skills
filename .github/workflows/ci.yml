@@ -31,6 +31,12 @@ jobs:
     - name: Validate SKILL.md integrity
       run: node .github/scripts/validate-skill-md.js
 
+    - name: Validate project root detection
+      run: node .github/scripts/validate-project-root.js
+
+    - name: Validate no React Hooks in JSX
+      run: node .github/scripts/validate-no-react-hooks.js
+
     - name: Install test dependencies
       run: npm install
 
