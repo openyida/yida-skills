@@ -532,7 +532,7 @@ const listUrlWithView = `https://www.aliwork.com/${appType}/workbench/${formUuid
 
 | 文档 | 路径 | 说明 |
 | --- | --- | --- |
-| 宜搭 JS API | `reference/yida-api.md` | 表单数据增删改查（7 个）、流程操作（6 个）、工具类 API（14 个），共 27 个 API 的完整参数与示例 |
+| 宜搭 JS API | `../../shared/yida-api.md` | 表单数据增删改查（7 个）、流程操作（6 个）、工具类 API（14 个），共 27 个 API 的完整参数与示例 |
 | 大模型 AI 接口 | `reference/model-api.md` | AI 文本生成接口的请求参数、返回值结构与调用示例 |
 | Schema 保存接口 | `reference/save-schema.md` | `saveFormSchema` 接口的请求参数与返回值 |
 

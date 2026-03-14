@@ -544,6 +544,16 @@ yida-create-form-page/
 
 > **提示**：如果需要创建的是自定义展示页面（无字段，用于部署 JSX 代码），请使用 `yida-create-page` 技能。
 
+## API 参考
+
+宜搭表单数据操作（`saveFormData`、`searchFormDatas` 等）、流程操作及工具类 API 的完整参数说明与示例，请参考：
+
+- **宜搭 JS API**：`../../shared/yida-api.md`（表单数据增删改查 7 个、流程操作 6 个、工具类 API 14 个，共 27 个 API）
+
+> 💡 表单提交测试数据时，可直接调用 `this.utils.yida.saveFormData({ formUuid, appType, formDataJson })` 新建表单实例，详见 `../../shared/yida-api.md` 的「表单数据操作」章节。
+
+---
+
 ## 注意事项
 - **临时文件写在当前工程根目录的 .cache 文件夹中，如果没有就创建一个文件夹，注意不要写在系统的其他文件夹中**
 - update 模式中，修改定义 JSON 的操作按顺序执行，注意操作间的依赖关系（如先删后加）
