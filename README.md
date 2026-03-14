@@ -32,6 +32,9 @@
 | `yida-publish-page` | 发布页面 | 将源码编译并部署 Schema 到宜搭平台 |
 | `yida-app` | 完整应用开发 | 从零到一搭建完整宜搭应用的全流程编排（编排型技能，无独立脚本） |
 | `yida-get-schema` | 获取表单 Schema | 调用 getFormSchema 接口获取表单完整 Schema 结构 |
+| `yida-import-app` | 导入存量应用 | 将线上已存在的宜搭应用导入到本地工作台，生成 PRD 与 schema cache |
+| `yida-analyze-app` | 分析存量应用 | 基于本地 PRD 和 schema cache 输出页面结构、字段统计、风险与建议 |
+| `yida-sync-app` | 同步存量应用 | 重新拉取线上应用结构，与本地 cache 对比并覆盖更新 PRD 与 schema cache |
 
 ---
 
@@ -89,6 +92,7 @@ yida-skills/
 │   ├── yida-custom-page/
 │   │   └── reference/            # 参考文档
 │   │       ├── yida-api.md
+│   │       ├── yida-js-api.md
 │   │       └── model-api.md
 │   ├── yida-publish-page/
 │   │   └── scripts/
@@ -96,7 +100,25 @@ yida-skills/
 │   │       ├── babel-transform/
 │   │       └── package.json
 │   ├── yida-app/
-│   └── yida-get-schema/
+│   ├── yida-get-schema/
+│   ├── yida-import-app/
+│   │   ├── references/
+│   │   │   └── app-model.md
+│   │   └── scripts/
+│   │       ├── import-app.js
+│   │       ├── app-import-lib.js
+│   │       ├── discover-live.py
+│   │       └── render-prd.js
+│   ├── yida-analyze-app/
+│   │   ├── references/
+│   │   │   └── analysis-report.md
+│   │   └── scripts/
+│   │       └── analyze-app.js
+│   └── yida-sync-app/
+│       ├── references/
+│       │   └── sync-strategy.md
+│       └── scripts/
+│           └── sync-app.js
 ├── examples/                      # 示例代码
 │   └── contact-form/
 ├── .github/
