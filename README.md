@@ -28,7 +28,7 @@
 | `yida-create-app` | 创建应用 | 调用 registerApp 接口快速创建宜搭应用 |
 | `yida-create-page` | 创建自定义页面 | 调用 saveFormSchemaInfo 接口创建自定义展示页面 |
 | `yida-create-form-page` | 创建表单页面 | 支持 19 种字段类型的表单创建与更新 |
-| `yida-custom-page` | 自定义页面开发 | 宜搭 JSX 组件开发规范、JS API 调用、代码编译与 Schema 部署 |
+| `yida-custom-page` | 自定义页面开发 | 宜搭 JSX 组件开发规范、JS API 调用（31 个 API）、代码编译与 Schema 部署 |
 | `yida-publish-page` | 发布页面 | 将源码编译并部署 Schema 到宜搭平台 |
 | `yida-page-config` | 页面配置 | 公开访问/分享 URL 验证与配置、隐藏顶部导航等页面设置 |
 | `yida-app` | 完整应用开发 | 从零到一搭建完整宜搭应用的全流程编排（编排型技能，无独立脚本） |
@@ -41,15 +41,13 @@
 ### 使用 openyida 默认工程模板（推荐）
 
 ```bash
-# 1. 克隆仓库（含 Skills 子模块）
-git clone --recurse-submodules https://github.com/openyida/openyida.git
+# 1.克隆工程模板仓库
 
-# 2. 使用代码编辑器打开项目，打开自己的 AI 编程工具
-# 3. 一句话生成应用：帮我搭建一个生日祝福小游戏应用
+  git clone https://github.com/openyida/openyida.git
+
+# 2. 使用代码编辑器打开项目，打开自己的 AI 编程工具，输入：执行安装脚本，等待 Skills 安装完成
+# 3. 一句话生成应用：帮我创建一个访客系统应用
 # 4. 根据需求文档生成应用：帮我搭建个人薪资计算器应用
-
-# 已克隆但未带子模块？执行以下命令补充初始化：
-# git submodule update --init --recursive
 ```
 
 ### 使用自己的项目工程，请参考文件结构约定

@@ -33,26 +33,6 @@ metadata:
 - 用户需要更新已有表单的字段（增删改）
 - 已通过 yida-create-app 创建应用后，需要创建表单来收集数据
 
-## 使用示例
-
-### 示例 1：创建新表单
-**场景**：在应用中创建一个简单的用户信息表单
-**命令**：
-```bash
-node .claude/skills/yida-create-form-page/scripts/create-form-page.js create "APP_XXX" "用户信息表" '[{"type":"TextField","label":"姓名","required":true},{"type":"SelectField","label":"部门","options":["技术部","产品部"]}]'
-```
-**输出**：
-```json
-{"success":true,"formUuid":"FORM-XXX","formTitle":"用户信息表","appType":"APP_XXX","fieldCount":2}
-```
-
-### 示例 2：更新已有表单
-**场景**：为已存在的表单添加新字段
-**命令**：
-```bash
-node .claude/skills/yida-create-form-page/scripts/create-form-page.js update "APP_XXX" "FORM-XXX" '[{"action":"add","field":{"type":"TextField","label":"备注"}}]'
-```
-
 ## 使用方式
 
 ### create 模式（创建新表单）
@@ -69,16 +49,20 @@ node .claude/skills/yida-create-form-page/scripts/create-form-page.js create <ap
 | `formTitle` | 是 | 表单名称 |
 | `fieldsJsonOrFile` | 是 | 字段定义，支持两种格式：JSON 字符串（以 `[` 开头）或 JSON 文件路径 |
 
-**示例**：
+**示例（JSON 字符串，推荐）**：
 
 ```bash
-node .claude/skills/yida-create-form-page/scripts/create-form-page.js create "APP_xxx" "图片生成表" .claude/skills/yida-create-form-page/scripts/fields.json
+node .claude/skills/yida-create-form-page/scripts/create-form-page.js create "APP_XXX" "用户信息表" '[{"type":"TextField","label":"姓名","required":true},{"type":"SelectField","label":"部门","options":["技术部","产品部"]}]'
+```
+**示例（JSON 文件）**：
+```bash
+node .claude/skills/yida-create-form-page/scripts/create-form-page.js create "APP_xxx" "用户信息表" .cache/user-info-fields.json
 ```
 
 **输出**：日志输出到 stderr，JSON 结果输出到 stdout：
 
 ```json
-{"success":true,"formUuid":"FORM-XXX","formTitle":"图片生成表","appType":"APP_xxx","fieldCount":4,"url":"{base_url}/APP_xxx/workbench/FORM-XXX"}
+{"success":true,"formUuid":"FORM-XXX","formTitle":"用户信息表","appType":"APP_xxx","fieldCount":4,"url":"{base_url}/APP_xxx/workbench/FORM-XXX"}
 ```
 
 ### update 模式（更新已有表单）
@@ -115,32 +99,20 @@ node .claude/skills/yida-create-form-page/scripts/create-form-page.js update "AP
 
 ## 字段定义 JSON 格式
 
-字段定义是一个 JSON 数组，每个元素描述一个字段。**支持两种格式**：
-
-### 格式一（推荐）
-
-直接在对象中定义 `type` 和 `label`：
+字段定义是一个 JSON 数组，每个元素描述一个字段。
 
 ```json
 [
   { "type": "TextField", "label": "姓名", "required": true },
   { "type": "SelectField", "label": "部门", "options": ["技术部", "产品部", "设计部"] },
-  { "type": "DateField", "label": "入职日期" }
+  { "type": "DateField", "label": "入职日期" },
+  { "type": "NumberField", "label": "年龄" },
+  { "type": "TableField", "label": "费用明细", "children": [
+    { "type": "TextField", "label": "项目" },
+    { "type": "NumberField", "label": "金额" }
+  ]}
 ]
 ```
-
-### 格式二（兼容）
-
-将字段属性放在 `field` 子对象中：
-
-```json
-[
-  { "field": { "type": "TextField", "label": "姓名" }, "required": true },
-  { "field": { "type": "SelectField", "label": "部门", "options": ["技术部"] } }
-]
-```
-
-> 两种格式效果相同，推荐使用格式一，更简洁。
 
 **字段属性**：
 
@@ -198,6 +170,26 @@ node .claude/skills/yida-create-form-page/scripts/create-form-page.js update "AP
 | `dataSourceType` | `"custom"` | 数据源类型 |
 | `valueType` | `"custom"` | 值类型 |
 
+**选项数据格式**：`dataSource` 和 `defaultDataSource.options` 中每个选项的结构如下，**`text.zh_CN` 和 `value` 必须是字符串，不能是对象**：
+
+```json
+{
+  "text": { "zh_CN": "选项一", "en_US": "选项一", "type": "i18n" },
+  "value": "选项一",
+  "sid": "serial_xxx",
+  "disable": false,
+  "defaultChecked": false
+}
+```
+
+❌ 错误格式（`text.zh_CN` 和 `value` 不能是 `{ label, value }` 对象）：
+```json
+{
+  "text": { "zh_CN": { "label": "选项一", "value": "选项一" }, "en_US": "New Option", "type": "i18n" },
+  "value": { "label": "选项一", "value": "选项一" }
+}
+```
+
 #### SelectField / MultiSelectField
 
 | 属性 | 默认值 | 说明 |
@@ -247,6 +239,8 @@ format 格式：
 | `startWithDepartmentId` | `"SELF"` | 起始部门 |
 | `renderLinkForView` | `true` | 查看时渲染链接 |
 | `closeOnSelect` | `false` | 选择后关闭 |
+> 如果需要人员默认选中当前登录人，用法参考 `reference/employee-field.md`
+
 
 #### DepartmentSelectField
 
@@ -320,7 +314,7 @@ format 格式：
 
 #### AssociationFormField
 
-> 详细用法参考 `reference/AssociationFormField.md`
+> 详细用法参考 `reference/association-form-field.md`
 
 #### SerialNumberField
 
@@ -346,6 +340,9 @@ format 格式：
 ```
 
 其中 `<escapedRuleJson>` 是 `{ "type": "custom", "value": <serialNumberRule数组> }` 的 JSON 字符串，需对双引号转义（`"` → `\"`）。
+
+> 详细用法参考 `reference/serial-number-field.md`
+
 
 ## 修改定义 JSON 格式（update 模式）
 
@@ -385,6 +382,7 @@ format 格式：
 ### add 的 field 字段定义
 
 与 create 模式的字段定义格式完全一致，参见上方「字段定义 JSON 格式」章节。
+
 
 ## 前置依赖
 
@@ -426,87 +424,7 @@ yida-create-form-page/
     ├── create-form-page.js     # 表单页面创建 & 更新脚本
 ```
 
-## 接口说明
 
-### saveFormSchemaInfo（创建空白表单，create 模式）
-
-- **地址**：`POST /dingtalk/web/{appType}/query/formdesign/saveFormSchemaInfo.json`
-- **Content-Type**：`application/x-www-form-urlencoded`
-- **参数**：
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `_csrf_token` | String | 是 | CSRF Token（由 yida-login 获取） |
-| `formType` | String | 是 | 表单类型，固定 `receipt` |
-| `title` | String (JSON) | 是 | 表单名称，i18n 格式：`{"zh_CN":"名称","en_US":"名称","type":"i18n"}` |
-
-- **返回值**：
-
-```json
-{
-  "content": { "formUuid": "FORM-XXX" },
-  "success": true
-}
-```
-
-### getFormSchema（获取表单 Schema，update 模式）
-
-- **地址**：`GET /alibaba/web/{appType}/_view/query/formdesign/getFormSchema.json`
-- **参数**：
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `formUuid` | String | 是 | 表单 UUID |
-| `schemaVersion` | String | 否 | Schema 版本，默认 `V5` |
-
-- **返回值**：完整的表单 Schema JSON，包含 `pages` 数组，结构与 `saveFormSchema` 保存的格式一致
-
-### saveFormSchema（保存表单 Schema，两种模式共用）
-
-- **地址**：`POST /dingtalk/web/{appType}/_view/query/formdesign/saveFormSchema.json`
-- **Content-Type**：`application/x-www-form-urlencoded`
-- **参数**：
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `_csrf_token` | String | 是 | CSRF Token（由 yida-login 获取） |
-| `formUuid` | String | 是 | 表单 UUID |
-| `content` | String (JSON) | 是 | 表单 Schema 内容（`schemaType: "superform"`） |
-| `schemaVersion` | String | 是 | 固定 `V5` |
-| `importSchema` | String | 是 | 固定 `"true"` |
-
-- **返回值**：
-
-```json
-{ "success": true }
-```
-
-### updateFormConfig（更新表单配置）
-
-- **地址**：`POST /dingtalk/web/{appType}/query/formdesign/updateFormConfig.json`
-- **Content-Type**：`application/x-www-form-urlencoded`
-- **参数**：
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `_csrf_token` | String | 是 | CSRF Token（由 yida-login 获取） |
-| `formUuid` | String | 是 | 表单 UUID |
-| `version` | Number | 是 | 版本号（新创建的表单从 1 开始） |
-| `configType` | String | 是 | 固定 `MINI_RESOURCE` |
-| `value` | Number | 是 | 固定 `0`（表单页面配置值） |
-
-- **返回值**：
-
-```json
-{
-  "success": true,
-  "traceId": null,
-  "throwable": null,
-  "errorCode": null,
-  "content": null,
-  "errorMsg": null
-}
-```
 
 ## 支持的字段类型
 
@@ -542,104 +460,8 @@ yida-create-form-page/
 6. **创建自定义页面** → 使用 `yida-create-page` 技能
 7. **部署页面代码** → 使用 `yida-publish` 技能
 
-> **提示**：如果需要创建的是自定义展示页面（无字段，用于部署 JSX 代码），请使用 `yida-create-page` 技能。
+> **提示**：如果需要创建的是自定义展示页面（无字段，用于部署 JSX 代码），请使用 `yida-create-page` 和 `yida-custom-page` 技能。
 
-## 表单数据操作 API
-
-> 以下 API 用于在自定义页面或脚本中对表单数据进行增删改查，通过 `this.utils.yida.<方法名>(params)` 调用，所有接口返回 Promise。
-
-### saveFormData — 新建表单实例
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `formUuid` | String | 是 | 表单 UUID |
-| `appType` | String | 是 | 应用 ID |
-| `formDataJson` | String | 是 | 表单数据（JSON 字符串） |
-
-> ⚠️ **注意**：DateField 字段的值必须是**时间戳（毫秒）**，不能是字符串。例如：
-> ```javascript
-> // ✅ 正确
-> dateField_xxx: new Date().getTime()
-> // ❌ 错误
-> dateField_xxx: '2024-01-15'
-> ```
-
-```javascript
-this.utils.yida.saveFormData({
-  formUuid: 'FORM-XXX',
-  appType: window.pageConfig.appType,
-  formDataJson: JSON.stringify({
-    textField_xxx: '单行文本',
-    numberField_xxx: 100,
-  }),
-}).then(function(res) {
-  console.log('新建成功，实例ID:', res.result);
-}).catch(function(err) {
-  console.error('新建失败:', err.message);
-});
-```
-
-### updateFormData — 更新表单实例
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `formInstId` | String | 是 | 表单实例 ID |
-| `updateFormDataJson` | String | 是 | 需要更新的字段（JSON 字符串） |
-
-> ⚠️ **注意**：DateField 字段的值必须是**时间戳（毫秒）**。
-
-```javascript
-this.utils.yida.updateFormData({
-  formInstId: 'FINST-XXX',
-  updateFormDataJson: JSON.stringify({ textField_xxx: '新值' }),
-});
-```
-
-### deleteFormData — 删除表单实例
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `formUuid` | String | 是 | 表单 UUID |
-| `formInstId` | String | 是 | 表单实例 ID |
-
-### getFormDataById — 查询单条实例详情
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `formInstId` | String | 是 | 表单实例 ID |
-
-### searchFormDatas — 按条件搜索实例列表
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `formUuid` | String | 是 | 表单 UUID |
-| `searchFieldJson` | String | 否 | 按字段值筛选（JSON 字符串） |
-| `currentPage` | Number | 否 | 当前页，默认 1 |
-| `pageSize` | Number | 否 | 每页记录数，默认 10，**最大 100** |
-
-```javascript
-this.utils.yida.searchFormDatas({
-  formUuid: 'FORM-XXX',
-  searchFieldJson: JSON.stringify({ textField_xxx: '查询值' }),
-  currentPage: 1,
-  pageSize: 10,
-}).then(function(res) {
-  // res.data: 实例列表，res.totalCount: 总数
-  console.log('查询结果:', res.data);
-});
-```
-
-### searchFormDataIds — 按条件搜索实例 ID 列表
-
-参数同 `searchFormDatas`，返回实例 ID 数组（适合批量操作场景）。
-
-### getFormComponentDefinationList — 获取表单字段定义
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `formUuid` | String | 是 | 表单 UUID |
-
----
 
 ## 注意事项
 - **临时文件写在当前工程根目录的 .cache 文件夹中，如果没有就创建一个文件夹，注意不要写在系统的其他文件夹中**
@@ -649,167 +471,60 @@ this.utils.yida.searchFormDatas({
 - 建议在重要修改前先通过 `get-schema` 技能查看当前 Schema 结构
 - 脚本兼容旧的 create 模式调用方式（不带 `create` 前缀），但推荐使用新的显式模式参数
 
-## EmployeeField 设置默认值为当前登录人
 
-`create-form-page.js` 的 update 模式不支持直接设置 EmployeeField 的"当前登录人"默认值，需要在 update 之后通过直接修改 Schema 的方式实现。
+## 其他 yida-api 参考路径
 
-### 正确的 Schema 配置格式
-
-宜搭 EmployeeField 设置默认值为当前登录人，需要同时修改以下三个属性（通过 `getFormSchema` 获取 Schema 后直接修改对应字段的 props，再调用 `saveFormSchema` 保存）：
-
-```json
-{
-  "valueType": "variable",
-  "complexValue": {
-    "complexType": "formula",
-    "formula": "USER()",
-    "value": []
-  },
-  "variable": {
-    "type": "user"
-  }
-}
-```
-
-> ⚠️ 注意：`formula` 必须是 `"USER()"`，不是 `"CURRENT_USER()"`（后者会被宜搭拒绝，报"表达式解析失败"错误）。
-
-### 修改步骤
-
-1. 调用 `getFormSchema` 获取当前 Schema（返回结构为 `{ success, content: { pages, ... } }`）
-2. 在 `content` 对象中递归找到目标 `fieldId` 的字段节点
-3. 将上述三个属性写入该字段节点
-4. 调用 `saveFormSchema` 传入修改后的 `content`（注意：传的是 `content` 对象，不是整个响应体）
-5. 调用 `updateFormConfig` 更新表单配置
-
-## SerialNumberField 流水号规则详解
-
-### 默认场景（无自定义需求）
-
-只有一条 `autoCount` 规则，4 位自增，从 1 开始，不重置：
-
-```json
-{
-  "serialNumberRule": [
-    {
-      "resetPeriod": "noClean",
-      "dateFormat": "yyyyMMdd",
-      "ruleType": "autoCount",
-      "timeZone": "+8",
-      "__sid": "item_auto_count",
-      "__hide_delete__": true,
-      "__sid__": "serial_auto_count",
-      "digitCount": "4",
-      "isFixed": true,
-      "initialValue": 1,
-      "content": "",
-      "formField": ""
-    }
-  ],
-  "serialNumPreview": "0001"
-}
-```
-
-> ⚠️ 注意：默认场景的 `autoCount` 规则 `__hide_delete__` 必须为 `true`（不可删除），`digitCount` 为字符串 `"4"`。
-
-### 自定义场景（多规则组合）
-
-支持以下 4 种规则类型，可任意组合排列：
-
-| `ruleType` | 说明 | 关键字段 |
+| 文档 | 路径 | 说明 |
 | --- | --- | --- |
-| `autoCount` | 自动计数（自增数字） | `digitCount`（位数，字符串）、`initialValue`（起始值）、`resetPeriod`（重置周期） |
-| `character` | 固定字符 | `content`（固定字符串内容） |
-| `date` | 提交日期 | `dateFormat`（日期格式，如 `"yy"`、`"yyyyMMdd"`） |
-| `form` | 取表单字段值 | `formField`（字段 fieldId） |
+| 宜搭 JS API | `reference/yida-api.md` | 表单操作类 API（7 个）、流程操作类 API（6 个）、表单设计类 API（4 个）、工具类 API（14 个），共 31 个 API 的完整参数与示例 |
+| 大模型 AI 接口 | `reference/model-api.md` | AI 文本生成接口的请求参数、返回值结构与调用示例 |
 
-**自定义规则通用结构**：
+### 表单设计类 API 说明
 
-```json
-{
-  "resetPeriod": "noClean",
-  "dateFormat": "yyyyMMdd",
-  "ruleType": "<类型>",
-  "timeZone": "+8",
-  "__sid": "item_<唯一id>",
-  "__hide_delete__": false,
-  "__sid__": "serial_<唯一id>",
-  "digitCount": 4,
-  "isFixed": true,
-  "initialValue": 1,
-  "content": "<固定字符，仅 character 类型填写>",
-  "formField": "<字段fieldId，仅 form 类型填写>",
-  "isFixedTips": "",
-  "resetPeriodTips": ""
-}
-```
+表单设计类 API 位于 `reference/yida-api.md` 的「表单设计类 API」章节，包含以下 4 个接口：
 
-> ⚠️ 注意：自定义规则中 `digitCount` 为**数字**类型（不是字符串），`__hide_delete__` 为 `false`；而默认 `autoCount` 规则的 `digitCount` 是**字符串** `"4"`，`__hide_delete__` 为 `true`。
-
-**`resetPeriod` 重置周期可选值**：
-
-| 值 | 说明 |
+| 接口 | 说明 |
 | --- | --- |
-| `"noClean"` | 不重置（永久自增） |
-| `"day"` | 每天重置 |
-| `"month"` | 每月重置 |
-| `"year"` | 每年重置 |
+| `saveFormSchemaInfo` | 创建空白表单（create 模式），返回新创建的 `formUuid` |
+| `getFormSchema` | 获取表单 Schema（update 模式），返回完整的表单 Schema JSON |
+| `saveFormSchema` | 保存表单 Schema（create/update 两种模式共用） |
+| `updateFormConfig` | 更新表单配置（设置 `MINI_RESOURCE` 等配置项） |
 
-**`dateFormat` 日期格式可选值**（`date` 类型规则）：
+### 表单数据操作 API 说明
 
-| 值 | 示例 |
+表单操作类 API 位于 `reference/yida-api.md` 的「表单操作类 API」章节，包含以下 7 个接口：
+
+| 接口 | 说明 |
 | --- | --- |
-| `"yy"` | `26`（年份后两位） |
-| `"yyyy"` | `2026` |
-| `"yyyyMM"` | `202603` |
-| `"yyyyMMdd"` | `20260311` |
+| `saveFormData` | 新建表单实例，用于提交表单数据 |
+| `updateFormData` | 更新表单中指定组件值 |
+| `searchFormDataIds` | 根据条件搜索表单实例 ID 列表 |
+| `getFormComponentDefinationList` | 获取表单定义（字段结构） |
+| `deleteFormData` | 删除表单实例 |
+| `getFormDataById` | 根据表单实例 ID 查询表单实例详情 |
+| `searchFormDatas` | 根据条件搜索表单实例详情列表 |
 
-**示例：`YY-提交日期-自动计数4位` 的规则配置**：
+**常用场景**：
 
-```json
-{
-  "serialNumberRule": [
-    {
-      "ruleType": "character",
-      "content": "YY",
-      "dateFormat": "yyyyMMdd", "timeZone": "+8",
-      "resetPeriod": "noClean", "digitCount": 4,
-      "isFixed": true, "initialValue": 1,
-      "isFixedTips": "", "resetPeriodTips": "",
-      "formField": "",
-      "__sid": "item_char_yy", "__sid__": "serial_char_yy", "__hide_delete__": false
-    },
-    {
-      "ruleType": "date",
-      "content": "",
-      "dateFormat": "yy", "timeZone": "+8",
-      "resetPeriod": "noClean", "digitCount": 4,
-      "isFixed": true, "initialValue": 1,
-      "isFixedTips": "", "resetPeriodTips": "",
-      "formField": "",
-      "__sid": "item_date_yy", "__sid__": "serial_date_yy", "__hide_delete__": false
-    },
-    {
-      "ruleType": "autoCount",
-      "content": "",
-      "dateFormat": "yyyyMMdd", "timeZone": "+8",
-      "resetPeriod": "noClean", "digitCount": 4,
-      "isFixed": true, "initialValue": 1,
-      "isFixedTips": "", "resetPeriodTips": "",
-      "formField": "",
-      "__sid": "item_auto", "__sid__": "serial_auto", "__hide_delete__": true
-    }
-  ],
-  "serialNumPreview": "YY260001"
-}
-```
+- **Mock 数据**：使用 `saveFormData` 批量创建测试数据
+- **数据查询**：使用 `searchFormDatas` 或 `getFormDataById` 获取表单数据
+- **数据更新**：使用 `updateFormData` 修改已有表单数据
+- **数据清理**：使用 `deleteFormData` 删除测试数据
 
-### formula 构建规则
-
-`formula` 必须是**对象格式**（不是字符串），`expression` 的最后一个参数是 `{ "type": "custom", "value": <serialNumberRule数组> }` 的 JSON 字符串，需对双引号转义：
+**使用示例**（Mock 数据）：
 
 ```javascript
-var ruleJson = JSON.stringify({ type: 'custom', value: serialNumberRule });
-var escapedRuleJson = ruleJson.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-var expression = 'SERIALNUMBER("' + corpId + '", "' + appType + '", "' + formUuid + '", "' + fieldId + '", "' + escapedRuleJson + '")';
-obj.formula = { expression: expression };
+// 创建测试数据
+this.utils.yida.saveFormData({
+  formUuid: 'FORM-XXX',
+  appType: 'APP_XXX',
+  formDataJson: JSON.stringify({
+    textField_xxx: '测试姓名',
+    selectField_xxx: '选项一',
+    numberField_xxx: 100,
+  }),
+}).then((res) => {
+  console.log('创建成功，实例ID:', res.result);
+});
 ```
+

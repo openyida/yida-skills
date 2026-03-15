@@ -43,7 +43,7 @@
  *   TextField, TextareaField, RadioField, SelectField, CheckboxField,
  *   MultiSelectField, NumberField, RateField, DateField, CascadeDateField,
  *   EmployeeField, DepartmentSelectField, CountrySelectField, AddressField,
- *   AttachmentField, ImageField, TableField, AssociationFormField
+ *   AttachmentField, ImageField, TableField, AssociationFormField, SerialNumberField
  *
  * 前置条件：
  *   项目根目录下需存在 .cache/cookies.json（由 yida-login 生成）。
@@ -225,7 +225,7 @@ function resolveBaseUrl(cookieData) {
  * 登录过期响应：{"success":false,"errorCode":"307","errorMsg":"登录状态已过期，请刷新页面后重新访问"}
  */
 function isLoginExpired(responseJson) {
-  return responseJson && responseJson.success === false && responseJson.errorCode === "307";
+  return responseJson && responseJson.success === false && (responseJson.errorCode === "307" || responseJson.errorCode === "302");
 }
 
 /**
@@ -368,10 +368,11 @@ const PLACEHOLDER_SELECT = i18n("请选择", "please select");
 function buildOptionDataSource(options) {
   return options.map(function (optionText, optionIndex) {
     return {
-      defaultChecked: false,
-      text: i18n(optionText, "New Option"),
+      text: { zh_CN: optionText, en_US: optionText, type: "i18n" },
       value: optionText,
       sid: "serial_" + Date.now().toString(36) + optionIndex,
+      disable: false,
+      defaultChecked: false,
     };
   });
 }
@@ -568,8 +569,6 @@ function buildFieldComponent(field) {
     props.tips = i18n("", "");
     props.multiple = field.multiple || false;
     props.hasClear = true;
-    props.valueType = "custom";
-    props.value = [];
     props.userRangeType = "ALL";
     props.roleRange = [];
     props.userRange = [];
@@ -579,14 +578,17 @@ function buildFieldComponent(field) {
     props.showEmplId = false;
     props.closeOnSelect = false;
     props.useAliworkUrl = false;
-    props.formula = "";
     props.linkage = "";
-    props.variable = "";
+
+    props.valueType = "variable";
     props.complexValue = {
-      complexType: "custom",
+      complexType: "formula",
+      formula: "USER()",
       value: [],
-      formula: "",
     };
+    props.variable = { type: "user" };
+    props.formula = "";
+    props.value = [];
   }
 
   // 部门字段
@@ -656,10 +658,10 @@ function buildFieldComponent(field) {
     props.__gridSpan = 1;
     props.tips = i18n("", "");
     props.valueType = "custom";
-    props.value = i18n("", "");
+    props.value = "";
     props.complexValue = {
       complexType: "custom",
-      value: i18n("", ""),
+      value: "",
       formula: "",
     };
     props.type = "normal";
@@ -685,10 +687,10 @@ function buildFieldComponent(field) {
     props.__gridSpan = 1;
     props.tips = i18n("", "");
     props.valueType = "custom";
-    props.value = i18n("", "");
+    props.value = "";
     props.complexValue = {
       complexType: "custom",
-      value: i18n("", ""),
+      value: "",
       formula: "",
     };
     props.aiRecognitionConfig = {};
@@ -2154,6 +2156,43 @@ async function mainCreate(parsedArgs, csrfToken, cookies, baseUrl, cookieData) {
   }
 }
 
+// ── 为 SerialNumberField 补全 formula（递归处理子表）──
+//
+// 遍历字段列表，对每个 SerialNumberField：
+//   - 若 formula 已有有效的 expression（从宜搭获取的已有字段），则跳过，不覆盖
+//   - 若 formula 为空对象 {} 或 expression 为空（新增字段），则自动构建 expression
+// 同时递归处理 TableField 的子字段（子表内也可能有流水号字段）
+
+function fillSerialNumberFormulas(components, corpId, appType, formUuid) {
+  if (!Array.isArray(components)) return;
+  components.forEach(function (component) {
+    if (component.componentName === "SerialNumberField" && component.props) {
+      var existingFormula = component.props.formula;
+      var hasValidFormula = existingFormula &&
+        typeof existingFormula === "object" &&
+        typeof existingFormula.expression === "string" &&
+        existingFormula.expression.length > 0;
+
+      if (!hasValidFormula) {
+        var fieldId = component.props.fieldId;
+        var serialNumberRule = component.props.serialNumberRule;
+        if (serialNumberRule) {
+          var ruleJson = JSON.stringify({ type: "custom", value: serialNumberRule });
+          var escapedRuleJson = ruleJson.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+          component.props.formula = {
+            expression: 'SERIALNUMBER("' + corpId + '", "' + appType + '", "' + formUuid + '", "' + fieldId + '", "' + escapedRuleJson + '")'
+          };
+          console.error("  🔢 SerialNumberField 「" + (component.props.label && component.props.label.zh_CN || fieldId) + "」formula 已设置");
+        }
+      }
+    }
+    // 递归处理子表内的字段
+    if (component.componentName === "TableField" && Array.isArray(component.children)) {
+      fillSerialNumberFormulas(component.children, corpId, appType, formUuid);
+    }
+  });
+}
+
 // ── update 模式主流程 ─────────────────────────────────
 
 async function mainUpdate(parsedArgs, csrfToken, cookies, baseUrl, cookieData) {
@@ -2250,19 +2289,7 @@ async function mainUpdate(parsedArgs, csrfToken, cookies, baseUrl, cookieData) {
 
   const formContainerUpdate = findFormContainer(schema.pages[0].componentsTree[0]);
   if (formContainerUpdate && formContainerUpdate.children) {
-    formContainerUpdate.children.forEach(function (component) {
-      if (component.componentName === "SerialNumberField" && component.props) {
-        var fieldId = component.props.fieldId;
-        var serialNumberRule = component.props.serialNumberRule;
-        if (serialNumberRule && !component.props.formula.expression) {
-          var ruleJson = JSON.stringify({ type: "custom", value: serialNumberRule });
-          var escapedRuleJson = ruleJson.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-          component.props.formula = {
-            expression: 'SERIALNUMBER("' + corpId + '", "' + appType + '", "' + formUuid + '", "' + fieldId + '", "' + escapedRuleJson + '")'
-          };
-        }
-      }
-    });
+    fillSerialNumberFormulas(formContainerUpdate.children, corpId, appType, formUuid);
   }
 
   // Step 5 & 6: 保存 Schema 并更新表单配置

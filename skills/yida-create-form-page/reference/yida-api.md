@@ -3,12 +3,13 @@
 调用方式：`this.utils.yida.<函数名>(params)`
 
 所有接口返回 Promise，统一使用 `.then()` 和 `.catch()` 处理结果和异常。
+所有 POST 类型的接口没有特殊说明，请求头的**Content-Type** 均为 `application/x-www-form-urlencoded`。
 
 ---
 
 ## 目录
 
-- [表单操作类 API](#表单操作类-api)
+- [表单数作类 API](#表单操作类-api)
   - [saveFormData](#saveformdata) - 新建表单实例
   - [updateFormData](#updateformdata) - 更新表单组件值
   - [searchFormDataIds](#searchformdataids) - 搜索表单实例 ID 列表
@@ -23,6 +24,11 @@
   - [getProcessInstances](#getprocessinstances) - 获取流程实例详情列表
   - [getProcessInstanceIds](#getprocessinstanceids) - 搜索流程实例 ID 列表
   - [getProcessInstanceById](#getprocessinstancebyid) - 获取流程实例详情
+- [表单设计类 API](#表单设计类-api)
+  - [saveFormSchemaInfo](#saveformschemainfo) - 创建空白表单
+  - [getFormSchema](#getformschema) - 获取表单 Schema
+  - [saveFormSchema](#saveformschema) - 保存表单 Schema
+  - [updateFormConfig](#updateformconfig) - 更新表单配置
 - [工具类 API](#工具类-api)
   - [dialog](#dialog) - 对话框
   - [formatter](#formatter) - 格式化工具
@@ -218,7 +224,7 @@ this.utils.yida.updateFormData({
 | :--- | :--- | :--- | :--- | :--- |
 | formUuid | String | 是 | 表单ID | `FORM-XXX` |
 | currentPage | Number | 否 | 当前页，默认 1 | `1` |
-| pageSize | Number | 否 | 每页记录数，默认 10，最大 100 | `10` |
+| pageSize | Number | 否 | 每页记录数，默认 10，**最大 100，超过 100 会报错** | `10` |
 | searchFieldJson | String | 否 | 根据表单内组件值查询（JSON字符串） | `JSON.stringify({ textField_xxx: '值' })` |
 
 **请求示例**：
@@ -325,7 +331,7 @@ this.utils.yida.getFormDataById({
 | formUuid | String | 是 | 表单ID | `FORM-XXX` |
 | searchFieldJson | String | 否 | 根据表单内组件值查询（JSON字符串） | `JSON.stringify({ textField_xxx: '值' })` |
 | currentPage | Number | 否 | 当前页，默认 1 | `1` |
-| pageSize | Number | 否 | 每页记录数，默认 10，最大 100 | `10` |
+| pageSize | Number | 否 | 每页记录数，默认 10，**最大 100，超过 100 会报错** | `10` |
 | originatorId | String | 否 | 根据数据提交人工号查询 | `'2134'` |
 | createFrom | String | 否 | 创建时间范围起始，格式 yyyy-MM-dd | `'2024-01-01'` |
 | createTo | String | 否 | 创建时间范围结束，格式 yyyy-MM-dd | `'2024-02-01'` |
@@ -540,7 +546,7 @@ this.utils.yida.deleteProcessInstance({
 | instanceStatus | String | 否 | 实例状态 | `'RUNNING'` |
 | approvedResult | String | 否 | 流程审批结果 | `'agree'` |
 | currentPage | Number | 否 | 当前页，默认 1 | `1` |
-| pageSize | Number | 否 | 每页记录数，默认 10，最大 100 | `10` |
+| pageSize | Number | 否 | 每页记录数，默认 10，**最大 100，超过 100 会报错** | `10` |
 | originatorId | String | 否 | 流程发起人工号 | `'2134'` |
 | createFrom | String | 否 | 创建时间范围起始，格式 yyyy-MM-dd | `'2024-01-01'` |
 | createTo | String | 否 | 创建时间范围结束，格式 yyyy-MM-dd | `'2024-02-01'` |
@@ -588,13 +594,15 @@ this.utils.yida.getProcessInstances({
 | instanceStatus | String | 否 | 实例状态 | `'RUNNING'` |
 | approvedResult | String | 否 | 流程审批结果 | `'agree'` |
 | currentPage | Number | 否 | 当前页，默认 1 | `1` |
-| pageSize | Number | 否 | 每页记录数，默认 10，最大 100 | `10` |
+| pageSize | Number | 否 | 每页记录数，默认 10，**最大 100，超过 100 会报错** | `10` |
 | originatorId | String | 否 | 流程发起人工号 | `'2134'` |
 | createFrom | String | 否 | 创建时间范围起始，格式 yyyy-MM-dd | `'2024-01-01'` |
 | createTo | String | 否 | 创建时间范围结束，格式 yyyy-MM-dd | `'2024-02-01'` |
 | modifiedFrom | String | 否 | 修改时间范围起始，格式 yyyy-MM-dd | `'2024-01-01'` |
 | modifiedTo | String | 否 | 修改时间范围结束，格式 yyyy-MM-dd | `'2024-02-01'` |
 | searchFieldJson | String | 否 | 根据表单内组件值查询（JSON字符串） | `JSON.stringify({ textField_xxx: '值' })` |
+
+> ⚠️ **注意**：`pageSize` 最大值为 **100**，禁止设置超过 100 的值，否则接口会报错。
 
 **请求示例**：
 
@@ -647,6 +655,89 @@ this.utils.yida.getProcessInstanceById({
 
 
 ---
+
+## 表单设计类 API
+
+### saveFormSchemaInfo（创建空白表单，create 模式）
+
+- **地址**：`POST /dingtalk/web/{appType}/query/formdesign/saveFormSchemaInfo.json`
+- **Content-Type**：`application/x-www-form-urlencoded`
+- **参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `_csrf_token` | String | 是 | CSRF Token（由 yida-login 获取） |
+| `formType` | String | 是 | 表单类型，固定 `receipt` |
+| `title` | String (JSON) | 是 | 表单名称，i18n 格式：`{"zh_CN":"名称","en_US":"名称","type":"i18n"}` |
+
+- **返回值**：
+
+```json
+{
+  "content": { "formUuid": "FORM-XXX" },
+  "success": true
+}
+```
+
+### getFormSchema（获取表单 Schema，update 模式）
+
+- **地址**：`GET /alibaba/web/{appType}/_view/query/formdesign/getFormSchema.json`
+- **参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `formUuid` | String | 是 | 表单 UUID |
+| `schemaVersion` | String | 否 | Schema 版本，默认 `V5` |
+
+- **返回值**：完整的表单 Schema JSON，包含 `pages` 数组，结构与 `saveFormSchema` 保存的格式一致。各字段的 `fieldId`（如 `textField_xxxxxxxx`）可从 Schema 中读取。
+
+### saveFormSchema（保存表单 Schema，两种模式共用）
+
+- **地址**：`POST /dingtalk/web/{appType}/_view/query/formdesign/saveFormSchema.json`
+- **Content-Type**：`application/x-www-form-urlencoded`
+- **参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `_csrf_token` | String | 是 | CSRF Token（由 yida-login 获取） |
+| `formUuid` | String | 是 | 表单 UUID |
+| `content` | String (JSON) | 是 | 表单 Schema 内容（`schemaType: "superform"`） |
+| `schemaVersion` | String | 是 | 固定 `V5` |
+| `importSchema` | String | 是 | 固定 `"true"` |
+
+- **返回值**：
+
+```json
+{ "success": true }
+```
+
+### updateFormConfig（更新表单配置）
+
+- **地址**：`POST /dingtalk/web/{appType}/query/formdesign/updateFormConfig.json`
+- **Content-Type**：`application/x-www-form-urlencoded`
+- **参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `_csrf_token` | String | 是 | CSRF Token（由 yida-login 获取） |
+| `formUuid` | String | 是 | 表单 UUID |
+| `version` | Number | 是 | 版本号（新创建的表单从 1 开始） |
+| `configType` | String | 是 | 固定 `MINI_RESOURCE` |
+| `value` | Number | 是 | 固定 `0`（表单页面配置值） |
+
+- **返回值**：
+
+```json
+{
+  "success": true,
+  "traceId": null,
+  "throwable": null,
+  "errorCode": null,
+  "content": null,
+  "errorMsg": null
+}
+```
+
 
 ## 工具类 API
 

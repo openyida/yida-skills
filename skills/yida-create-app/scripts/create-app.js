@@ -259,7 +259,7 @@ function resolveBaseUrl(cookieData) {
  * 登录过期响应：{"success":false,"errorCode":"307","errorMsg":"登录状态已过期，请刷新页面后重新访问"}
  */
 function isLoginExpired(responseJson) {
-  return responseJson && responseJson.success === false && responseJson.errorCode === "307";
+  return responseJson && responseJson.success === false && (responseJson.errorCode === "307" || responseJson.errorCode === "302");
 }
 
 /**

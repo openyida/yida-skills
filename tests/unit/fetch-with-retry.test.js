@@ -1,8 +1,284 @@
 /**
  * 测试用例 - fetch-with-retry.js 公共模块
+ * 
+ * 注意：此文件已内联 fetch-with-retry.js 的核心函数，不再依赖外部共享模块
  */
 
-const path = require('path');
+const https = require("https");
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+const { execSync } = require("child_process");
+
+// ── 内联的 fetch-with-retry.js 核心函数 ───────────────────────────────
+
+/**
+ * 查找项目根目录（向上查找 README.md 或 .git 目录）
+ */
+function findProjectRoot() {
+  for (const startDir of [process.cwd(), __dirname]) {
+    let currentDir = startDir;
+    while (currentDir !== path.dirname(currentDir)) {
+      if (
+        fs.existsSync(path.join(currentDir, "README.md")) ||
+        fs.existsSync(path.join(currentDir, ".git"))
+      ) {
+        return currentDir;
+      }
+      currentDir = path.dirname(currentDir);
+    }
+  }
+  return process.cwd();
+}
+
+const PROJECT_ROOT = findProjectRoot();
+const CONFIG_PATH = path.join(PROJECT_ROOT, "config.json");
+const COOKIE_FILE = path.join(PROJECT_ROOT, ".cache", "cookies.json");
+const LOGIN_SCRIPT = path.join(
+  PROJECT_ROOT,
+  ".claude",
+  "skills",
+  "yida-login",
+  "scripts",
+  "login.py"
+);
+
+const CONFIG = fs.existsSync(CONFIG_PATH)
+  ? JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8"))
+  : {};
+const DEFAULT_BASE_URL = CONFIG.defaultBaseUrl || "https://www.aliwork.com";
+
+/**
+ * 从 Cookie 列表中提取 csrf_token 和 corp_id
+ */
+function extractInfoFromCookies(cookies) {
+  let csrfToken = null;
+  let corpId = null;
+  for (const cookie of cookies) {
+    if (cookie.name === "tianshu_csrf_token") {
+      csrfToken = cookie.value;
+    } else if (cookie.name === "tianshu_corp_user") {
+      const lastUnderscore = cookie.value.lastIndexOf("_");
+      if (lastUnderscore > 0) {
+        corpId = cookie.value.slice(0, lastUnderscore);
+      }
+    }
+  }
+  return { csrfToken, corpId };
+}
+
+/**
+ * 加载本地 Cookie 数据
+ */
+function loadCookieData() {
+  if (!fs.existsSync(COOKIE_FILE)) return null;
+  try {
+    const raw = fs.readFileSync(COOKIE_FILE, "utf-8").trim();
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const cookieData = Array.isArray(parsed)
+      ? { cookies: parsed, base_url: DEFAULT_BASE_URL }
+      : parsed;
+
+    if (cookieData.cookies && cookieData.cookies.length > 0) {
+      const { csrfToken, corpId } = extractInfoFromCookies(cookieData.cookies);
+      if (csrfToken) cookieData.csrf_token = csrfToken;
+      if (corpId) cookieData.corp_id = corpId;
+    }
+    return cookieData;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 解析 base_url
+ */
+function resolveBaseUrl(cookieData) {
+  return ((cookieData && cookieData.base_url) || DEFAULT_BASE_URL).replace(/\/+$/, "");
+}
+
+/**
+ * 触发完整登录流程（扫码）
+ */
+function triggerLogin() {
+  console.error("\n🔐 登录态失效，正在调用 login.py 重新登录...\n");
+  if (!fs.existsSync(LOGIN_SCRIPT)) {
+    console.error(`  ❌ 登录脚本不存在: ${LOGIN_SCRIPT}`);
+    process.exit(1);
+  }
+  const stdout = execSync(`python3 "${LOGIN_SCRIPT}"`, {
+    encoding: "utf-8",
+    stdio: ["inherit", "pipe", "inherit"],
+    timeout: 180_000,
+  });
+  const lines = stdout.trim().split("\n");
+  const jsonLine = lines[lines.length - 1];
+  try {
+    const loginResult = JSON.parse(jsonLine);
+    if (!loginResult.cookies) throw new Error("登录结果缺少 cookies");
+    return loginResult;
+  } catch (err) {
+    console.error(`  ❌ 解析登录结果失败: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * 刷新 CSRF Token（无头模式，无需扫码）
+ */
+function refreshCsrfToken() {
+  console.error("\n🔄 csrf_token 已过期，正在刷新...\n");
+  if (!fs.existsSync(LOGIN_SCRIPT)) {
+    console.error(`  ❌ 登录脚本不存在: ${LOGIN_SCRIPT}`);
+    process.exit(1);
+  }
+  const stdout = execSync(`python3 "${LOGIN_SCRIPT}" --refresh-csrf`, {
+    encoding: "utf-8",
+    stdio: ["inherit", "pipe", "inherit"],
+    timeout: 60_000,
+  });
+  const lines = stdout.trim().split("\n");
+  const jsonLine = lines[lines.length - 1];
+  try {
+    const result = JSON.parse(jsonLine);
+    if (!result.csrf_token || !result.cookies) {
+      throw new Error("刷新结果缺少 csrf_token 或 cookies");
+    }
+    return result;
+  } catch (err) {
+    console.error(`  ❌ 解析刷新结果失败: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+// ── 响应错误类型判断 ──────────────────────────────────────────────────
+
+function isLoginExpired(responseJson) {
+  return (
+    responseJson &&
+    responseJson.success === false &&
+    (responseJson.errorCode === "307" || responseJson.errorCode === "302")
+  );
+}
+
+function isCsrfTokenExpired(responseJson) {
+  return (
+    responseJson &&
+    responseJson.success === false &&
+    responseJson.errorCode === "TIANSHU_000030"
+  );
+}
+
+// ── 核心：带重试的 HTTP 请求 ──────────────────────────────────────────
+
+/**
+ * 发送单次 HTTP 请求
+ */
+function sendRequest({ url, method = "GET", body, headers = {}, timeout = 30_000 }) {
+  return new Promise((resolve, reject) => {
+    const parsedUrl = new URL(url);
+    const isHttps = parsedUrl.protocol === "https:";
+    const requestModule = isHttps ? https : http;
+
+    const requestOptions = {
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || (isHttps ? 443 : 80),
+      path: parsedUrl.pathname + parsedUrl.search,
+      method,
+      headers: {
+        ...headers,
+        ...(body ? { "Content-Length": Buffer.byteLength(body) } : {}),
+      },
+      timeout,
+    };
+
+    const request = requestModule.request(requestOptions, (response) => {
+      let responseData = "";
+      response.on("data", (chunk) => { responseData += chunk; });
+      response.on("end", () => {
+        try {
+          resolve(JSON.parse(responseData));
+        } catch {
+          reject(new Error(`响应非 JSON（HTTP ${response.statusCode}）：${responseData.slice(0, 200)}`));
+        }
+      });
+    });
+
+    request.on("timeout", () => {
+      request.destroy();
+      reject(new Error("请求超时（ETIMEDOUT）"));
+    });
+
+    request.on("error", reject);
+
+    if (body) request.write(body);
+    request.end();
+  });
+}
+
+/**
+ * 带自动重试的 HTTP 请求
+ */
+async function fetchWithRetry(requestOptions, authContext, maxRetries = 3) {
+  let { cookieData } = authContext;
+  const { onAuthUpdate } = authContext;
+
+  function buildCookieHeader(cookies) {
+    return cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+  }
+
+  function buildHeaders() {
+    const baseUrl = resolveBaseUrl(cookieData);
+    return {
+      ...requestOptions.headers,
+      Cookie: buildCookieHeader(cookieData.cookies || []),
+      Origin: baseUrl,
+      Referer: baseUrl + "/",
+    };
+  }
+
+  async function sendWithNetworkRetry(opts, attempt = 1) {
+    try {
+      return await sendRequest(opts);
+    } catch (networkError) {
+      if (attempt >= maxRetries) {
+        throw networkError;
+      }
+      const waitMs = Math.pow(2, attempt) * 500;
+      console.error(
+        `  ⚠️  请求失败（${networkError.message}），${waitMs}ms 后重试（${attempt}/${maxRetries}）...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      return sendWithNetworkRetry(opts, attempt + 1);
+    }
+  }
+
+  let response = await sendWithNetworkRetry({
+    ...requestOptions,
+    headers: buildHeaders(),
+  });
+
+  if (isCsrfTokenExpired(response)) {
+    cookieData = refreshCsrfToken();
+    if (onAuthUpdate) onAuthUpdate(cookieData);
+    response = await sendWithNetworkRetry({
+      ...requestOptions,
+      headers: buildHeaders(),
+    });
+  }
+
+  if (isLoginExpired(response)) {
+    cookieData = triggerLogin();
+    if (onAuthUpdate) onAuthUpdate(cookieData);
+    response = await sendWithNetworkRetry({
+      ...requestOptions,
+      headers: buildHeaders(),
+    });
+  }
+
+  return { response, cookieData };
+}
 
 // Mock fs 模块
 jest.mock('fs', () => ({
@@ -16,50 +292,28 @@ jest.mock('child_process', () => ({
   execSync: jest.fn()
 }));
 
-const fs = require('fs');
-const { execSync } = require('child_process');
+const mockFs = require('fs');
+const { execSync: mockExecSync } = require('child_process');
 
 describe('fetch-with-retry.js 公共模块', () => {
-  let fetchWithRetry;
-  let loadCookieData;
-  let resolveBaseUrl;
-  let extractInfoFromCookies;
-  let isLoginExpired;
-  let isCsrfTokenExpired;
+  let mockFetchWithRetry;
+  let mockLoadCookieData;
+  let mockResolveBaseUrl;
+  let mockExtractInfoFromCookies;
+  let mockIsLoginExpired;
+  let mockIsCsrfTokenExpired;
 
   beforeAll(() => {
     jest.resetModules();
-    // 直接测试内部函数
-    const modulePath = path.join(__dirname, '../../skills/shared/fetch-with-retry.js');
-    const module = require(modulePath);
-    fetchWithRetry = module.fetchWithRetry;
-    loadCookieData = module.loadCookieData;
-    resolveBaseUrl = module.resolveBaseUrl;
+    // 使用内联的函数
+    mockFetchWithRetry = fetchWithRetry;
+    mockLoadCookieData = loadCookieData;
+    mockResolveBaseUrl = resolveBaseUrl;
     
-    // 私有函数通过提取源代码测试
-    extractInfoFromCookies = (cookies) => {
-      let csrfToken = null;
-      let corpId = null;
-      for (const cookie of cookies) {
-        if (cookie.name === 'tianshu_csrf_token') {
-          csrfToken = cookie.value;
-        } else if (cookie.name === 'tianshu_corp_user') {
-          const lastUnderscore = cookie.value.lastIndexOf('_');
-          if (lastUnderscore > 0) {
-            corpId = cookie.value.slice(0, lastUnderscore);
-          }
-        }
-      }
-      return { csrfToken, corpId };
-    };
-
-    isLoginExpired = (responseJson) => {
-      return !!(responseJson && responseJson.success === false && responseJson.errorCode === '307');
-    };
-
-    isCsrfTokenExpired = (responseJson) => {
-      return responseJson && responseJson.success === false && responseJson.errorCode === 'TIANSHU_000030';
-    };
+    // 使用内联的私有函数
+    mockExtractInfoFromCookies = extractInfoFromCookies;
+    mockIsLoginExpired = isLoginExpired;
+    mockIsCsrfTokenExpired = isCsrfTokenExpired;
   });
 
   describe('extractInfoFromCookies', () => {
@@ -68,7 +322,7 @@ describe('fetch-with-retry.js 公共模块', () => {
         { name: 'tianshu_csrf_token', value: 'abc123csrf' },
         { name: 'other_cookie', value: 'some_value' }
       ];
-      const result = extractInfoFromCookies(cookies);
+      const result = mockExtractInfoFromCookies(cookies);
       expect(result.csrfToken).toBe('abc123csrf');
       expect(result.corpId).toBeNull();
     });
@@ -77,13 +331,13 @@ describe('fetch-with-retry.js 公共模块', () => {
       const cookies = [
         { name: 'tianshu_corp_user', value: 'corp123_user456' }
       ];
-      const result = extractInfoFromCookies(cookies);
+      const result = mockExtractInfoFromCookies(cookies);
       expect(result.corpId).toBe('corp123');
       expect(result.csrfToken).toBeNull();
     });
 
     test('处理空的 cookies 数组', () => {
-      const result = extractInfoFromCookies([]);
+      const result = mockExtractInfoFromCookies([]);
       expect(result.csrfToken).toBeNull();
       expect(result.corpId).toBeNull();
     });
@@ -93,7 +347,7 @@ describe('fetch-with-retry.js 公共模块', () => {
       const cookies = [
         { name: 'tianshu_corp_user', value: 'nounderscore' }
       ];
-      const result = extractInfoFromCookies(cookies);
+      const result = mockExtractInfoFromCookies(cookies);
       expect(result.corpId).toBeNull();
     });
   });
@@ -101,76 +355,77 @@ describe('fetch-with-retry.js 公共模块', () => {
   describe('resolveBaseUrl', () => {
     test('从 cookieData 中获取 base_url', () => {
       const cookieData = { base_url: 'https://www.aliwork.com/' };
-      expect(resolveBaseUrl(cookieData)).toBe('https://www.aliwork.com');
+      expect(mockResolveBaseUrl(cookieData)).toBe('https://www.aliwork.com');
     });
 
     test('处理空 cookieData', () => {
-      expect(resolveBaseUrl(null)).toBe('https://www.aliwork.com');
-      expect(resolveBaseUrl({})).toBe('https://www.aliwork.com');
+      expect(mockResolveBaseUrl(null)).toBe('https://www.aliwork.com');
+      expect(mockResolveBaseUrl({})).toBe('https://www.aliwork.com');
     });
 
     test('去除尾部斜杠', () => {
       const cookieData = { base_url: 'https://www.aliwork.com///' };
-      expect(resolveBaseUrl(cookieData)).toBe('https://www.aliwork.com');
+      expect(mockResolveBaseUrl(cookieData)).toBe('https://www.aliwork.com');
     });
   });
 
   describe('isLoginExpired', () => {
     test('正确识别登录过期', () => {
       const response = { success: false, errorCode: '307' };
-      expect(isLoginExpired(response)).toBe(true);
+      expect(mockIsLoginExpired(response)).toBe(true);
     });
 
     test('非 307 错误不触发', () => {
       const response = { success: false, errorCode: '500' };
-      expect(isLoginExpired(response)).toBe(false);
+      expect(mockIsLoginExpired(response)).toBe(false);
     });
 
     test('成功响应不触发', () => {
       const response = { success: true };
-      expect(isLoginExpired(response)).toBe(false);
+      expect(mockIsLoginExpired(response)).toBe(false);
     });
 
     test('空响应不触发', () => {
-      expect(isLoginExpired(null)).toBe(false);
-      expect(isLoginExpired({})).toBe(false);
+      // null && ... 短路返回 null，{} && false 返回 false，均为 falsy
+      expect(mockIsLoginExpired(null)).toBeFalsy();
+      expect(mockIsLoginExpired({})).toBeFalsy();
     });
   });
 
   describe('isCsrfTokenExpired', () => {
     test('正确识别 CSRF Token 过期', () => {
       const response = { success: false, errorCode: 'TIANSHU_000030' };
-      expect(isCsrfTokenExpired(response)).toBe(true);
+      expect(mockIsCsrfTokenExpired(response)).toBe(true);
     });
 
     test('非 TIANSHU_000030 错误不触发', () => {
       const response = { success: false, errorCode: 'TIANSHU_000031' };
-      expect(isCsrfTokenExpired(response)).toBe(false);
+      expect(mockIsCsrfTokenExpired(response)).toBe(false);
     });
   });
 
   describe('loadCookieData', () => {
     beforeEach(() => {
       // 每个测试前重置 mock 状态，避免上一个测试的 mockReturnValue 影响下一个
-      fs.existsSync.mockReset();
-      fs.readFileSync.mockReset();
+      mockFs.existsSync.mockReset();
+      mockFs.readFileSync.mockReset();
     });
 
     test('文件不存在返回 null', () => {
-      fs.existsSync.mockReturnValue(false);
-      expect(loadCookieData()).toBeNull();
+      mockFs.existsSync.mockReturnValue(false);
+      expect(mockLoadCookieData()).toBeNull();
     });
 
     test('文件为空返回 null', () => {
-      fs.existsSync.mockReturnValue(true);
-      fs.readFileSync.mockReturnValue('');
-      expect(loadCookieData()).toBeNull();
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue('');
+      expect(mockLoadCookieData()).toBeNull();
     });
 
     test('无效 JSON 返回 null', () => {
-      fs.existsSync.mockReturnValue(true);
-      fs.readFileSync.mockReturnValue('invalid json');
-      expect(loadCookieData()).toBeNull();
+      mockFs.existsSync.mockReturnValue(true);
+      mockFs.readFileSync.mockReturnValue('invalid json');
+      expect(mockLoadCookieData()).toBeNull();
     });
 
     // 以下两个测试验证 loadCookieData 的数据转换逻辑
@@ -199,7 +454,7 @@ describe('fetch-with-retry.js 公共模块', () => {
         base_url: 'https://test.aliwork.com'
       };
       // 模拟 loadCookieData 内部的信息提取逻辑
-      const { csrfToken, corpId } = extractInfoFromCookies(mockData.cookies);
+      const { csrfToken, corpId } = mockExtractInfoFromCookies(mockData.cookies);
       if (csrfToken) mockData.csrf_token = csrfToken;
       if (corpId) mockData.corp_id = corpId;
 

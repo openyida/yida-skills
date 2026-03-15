@@ -100,60 +100,9 @@ yida-publish/
 
 ## 接口说明
 
-### saveFormSchema
+`saveFormSchema` 和 `updateFormConfig` 接口的完整参数、返回值和错误处理机制，请参考 `reference/yida-api.md` 文档中的「表单设计类 API」章节。
 
-- **地址**：`POST /alibaba/web/{appType}/_view/query/formdesign/saveFormSchema.json`
-- **Content-Type**：`application/x-www-form-urlencoded`
-- **参数**：
-
-| 参数 | 值 |
-| --- | --- |
-| `_csrf_token` | 从 yida-login 获取 |
-| `prefix` | `_view` |
-| `content` | Schema JSON 字符串 |
-| `formUuid` | 自定义页面 ID |
-| `schemaVersion` | `V5` |
-| `domainCode` | `tEXDRG` |
-| `importSchema` | `true` |
-
-- **返回值**：
-
-```json
-{
-  "success": true,
-  "content": {
-    "formUuid": "FORM-XXX",
-    "version": 0
-  }
-}
-```
-
-### updateFormConfig
-
-- **地址**：`POST /dingtalk/web/{appType}/query/formdesign/updateFormConfig.json`
-- **Content-Type**：`application/x-www-form-urlencoded`
-- **参数**：
-
-| 参数 | 值 |
-| --- | --- |
-| `_csrf_token` | 从 yida-login 获取 |
-| `formUuid` | 自定义页面 ID（从 saveFormSchema 返回值获取） |
-| `version` | 版本号（从 saveFormSchema 返回值获取，从 0 开始递增） |
-| `configType` | 固定 `MINI_RESOURCE` |
-| `value` | 固定 `8`（自定义页面配置值） |
-
-- **返回值**：
-
-```json
-{
-  "success": true,
-  "traceId": null,
-  "throwable": null,
-  "errorCode": null,
-  "content": null,
-  "errorMsg": null
-}
-```
+> **注意**：自定义页面发布时，`updateFormConfig` 的 `value` 参数固定为 `8`（区别于表单页面的 `0`）。
 
 ## 与其他技能配合
 

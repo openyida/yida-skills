@@ -104,28 +104,6 @@ function parseArgs() {
   };
 }
 
-// ── 参数解析 ─────────────────────────────────────────
-
-function parseArgs() {
-  const args = process.argv.slice(2);
-  if (args.length < 3) {
-    console.error("用法: node verify-short-url.js <appType> <formUuid> <url>");
-    console.error("示例: node .claude/skills/yida-verify-short-url/scripts/verify-short-url.js \"APP_XXX\" \"FORM-XXX\" \"/o/aaa\"");
-    console.error("  支持两种格式：");
-    console.error("    /o/xxx - 公开访问（对外）");
-    console.error("    /s/xxx - 组织内分享（对内）");
-    process.exit(1);
-  }
-  const url = args[2];
-  const urlType = url.startsWith("/o/") ? "open" : url.startsWith("/s/") ? "share" : null;
-  return {
-    appType: args[0],
-    formUuid: args[1],
-    url: url,
-    urlType: urlType,
-  };
-}
-
 /**
  * 验证 URL 格式
  * - /o/xxx - 公开访问（对外）
@@ -227,7 +205,7 @@ function resolveBaseUrl(cookieData) {
  * 登录过期响应：{"success":false,"errorCode":"307","errorMsg":"登录状态已过期，请刷新页面后重新访问"}
  */
 function isLoginExpired(responseJson) {
-  return responseJson && responseJson.success === false && responseJson.errorCode === "307";
+  return responseJson && responseJson.success === false && (responseJson.errorCode === "307" || responseJson.errorCode === "302");
 }
 
 /**

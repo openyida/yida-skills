@@ -36,7 +36,7 @@ metadata:
 **场景**：手动触发扫码登录
 **命令**：
 ```bash
-python3 .claude/skills/skills/yida-login/scripts/login.py
+python3 .claude/skills/yida-login/scripts/login.py
 ```
 **输出**：
 ```json
@@ -47,13 +47,13 @@ python3 .claude/skills/skills/yida-login/scripts/login.py
 **场景**：CSRF Token 失效但 Cookie 有效
 **命令**：
 ```bash
-python3 .claude/skills/skills/yida-login/scripts/login.py --refresh-csrf
+python3 .claude/skills/yida-login/scripts/login.py --refresh-csrf
 ```
 
 ## 使用方式
 
 ```bash
-python3 .claude/skills/skills/yida-login/scripts/login.py
+python3 .claude/skills/yida-login/scripts/login.py
 ```
 
 无需任何参数，登录地址从项目根目录的 `config.json` 中读取（`loginUrl` 字段），登录后可能跳转到 `abcd.aliwork.com` 等域名。

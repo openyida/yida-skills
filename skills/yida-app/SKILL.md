@@ -38,8 +38,8 @@ metadata:
 2. 需求分析，写入 prd 文档
 3. 调用 yida-create-page 创建自定义页面
 4. 如需存储数据，调用 yida-create-form-page 创建表单
-5. 调用 yida-custom-page 编写页面代码
-6. 调用 yida-publish-page 发布页面
+5. 调用 yida-custom-page 编写自定义页面代码
+6. 调用 yida-publish-page 发布自定义页面
 
 ---
 
@@ -325,10 +325,10 @@ node publish.js APP_XXX FORM-XXXXXX pages/src/xxx.js
 | `yida-logout` | 退出登录 | 需要切换账号或 Cookie 失效时 |
 | `yida-create-app` | 创建应用 | Step 1，获取 appType |
 | `yida-create-page` | 创建自定义页面 | Step 2，获取 pageId |
-| `yida-create-form-page` | 创建表单页面 | Step 5，需要存储数据时 |
+| `yida-create-form-page` | 创建表单页面并构建 Schema，然后直接发布到宜搭 | Step 5，需要存储数据时 |
 | `yida-get-schema` | 获取表单 Schema | 需要分析已有表单字段结构时 |
-| `yida-custom-page` | 编写自定义页面代码 | Step 6，核心开发阶段 |
-| `yida-publish-page` | 编译并发布代码 | Step 7，部署到宜搭 |
+| `yida-custom-page` | 编写自定义页面代码 | Step 6，核心开发自定义页面代码 |
+| `yida-publish-page` | 编译并发布自定义页面代码 | Step 7，发布自定义页面到宜搭 |
 
 ### 关键配置速查
 

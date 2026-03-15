@@ -200,6 +200,7 @@ yida-page-config/
 └── scripts/
     ├── verify-short-url.js        # URL 验证脚本
     ├── save-share-config.js       # 公开访问/分享配置保存脚本
+    ├── get-page-config.js         # 查询页面配置脚本
     └── update-form-config.js      # 表单配置更新脚本（如隐藏导航）
 ```
 
