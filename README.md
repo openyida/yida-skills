@@ -118,6 +118,12 @@ yida-skills/
 
 ## DEMO 展示
 
+### 业务系统 - IPD/CRM
+
+![IPD](https://img.alicdn.com/imgextra/i2/O1CN01YBEMa929J7sD9v8U1_!!6000000008046-2-tps-3840-3366.png)
+
+![CRM](https://img.alicdn.com/imgextra/i3/O1CN01kn0Vcn1H5OkbQaizA_!!6000000000706-2-tps-3840-2168.png)
+
 ### 💰 小工具 - 个人薪资计算器
 
 ![薪资计算器](https://gw.alicdn.com/imgextra/i2/O1CN017TeJuE1reVH2Dj7b7_!!6000000005656-2-tps-5114-2468.png)
