@@ -259,7 +259,19 @@ this.forceUpdate();
 
 ### 编码注意事项
 
-1. **自定义方法必须用 `export function` 定义**：凡是需要在方法内部使用 `this`（包括 `this.utils.yida.*`、`this.setCustomState` 等）的自定义方法，**必须且只能**使用 `export function 方法名() {}` 的形式定义，调用时使用 `this.方法名()`。**禁止**使用 `const fn = () => {}`、`const fn = function() {}` 等形式定义需要访问 `this` 的方法，这些形式无法被宜搭运行时正确绑定 `this`：
+1. **箭头函数捕获 this**：同 react 的 render 函数一样，在 `renderJsx` 内部定义的事件处理函数中，**必须使用箭头函数**自动捕获 `this`：
+   ```javascript
+   export function renderJsx() {
+     // ✅ 正确：箭头函数自动捕获 this
+     const handleSubmit = () => {
+       this.setCustomState({ submitted: true });
+       this.utils.toast({ title: '提交成功', type: 'success' });
+     };
+     return <button onClick={handleSubmit}>提交</button>;
+   }
+   ```
+
+2. **自定义方法必须用 `export function` 定义**：凡是需要在方法内部使用 `this`（包括 `this.utils.yida.*`、`this.setCustomState` 等）的自定义方法，**必须且只能**使用 `export function 方法名() {}` 的形式定义，调用时使用 `this.方法名()`。**禁止**使用 `const fn = () => {}`、`const fn = function() {}` 等形式定义需要访问 `this` 的方法，这些形式无法被宜搭运行时正确绑定 `this`：
    ```javascript
    // ✅ 正确：export function + this.方法名() 调用
    export function didMount() {
@@ -284,17 +296,6 @@ this.forceUpdate();
    const loadStatistics = function() {
      this.utils.yida.searchFormDatas(...);  // 报错：this is undefined
    };
-   ```
-2. 事件绑定说明：**同 React 事件绑定中的 this 处理一样**：在 `renderJsx` 中绑定事件处理器时，**必须使用箭头函数**来捕获 `this`，事件的回调方法需要使用 export function 定义：
-
-   ```javascript
-   export function handleSubmit(e) {
-     this.setCustomState({ submitted: true });
-     this.utils.toast({ title: '提交成功', type: 'success' });
-   };
-   export function renderJsx() {
-     return <button onClick={(e) => {this.handleSubmit(e)}}>提交</button>;
-   }
    ```
 
 3. **输入法组合输入处理**：使用 `_isComposing` 标记配合 `compositionstart` / `compositionend` 事件，正确处理中文输入法的组合输入状态，避免输入过程中触发提交
@@ -356,22 +357,6 @@ this.forceUpdate();
     ```
 
 15. **iframe 嵌入表单 URL 规范**：在自定义页面中通过 iframe 嵌入宜搭表单时，需使用正确的 URL 格式：
-
-    | 场景 | URL 格式 |
-    |------|----------|
-    | 表单提交页 | `{base_url}/{appType}/submission/{formUuid}` |
-    | 数据管理页（列表） | `{base_url}/{appType}/workbench/{formUuid}?iframe=true` |
-    | 数据管理页（指定视图） | `{base_url}/{appType}/workbench/{formUuid}?viewUuid={viewUuid}&iframe=true` |
-
-    ```javascript
-    // ❌ 错误：formDetail 是表单详情页，不是数据列表
-    const wrongUrl = `${baseUrl}/${appType}/formDetail/${formUuid}`;
-
-    // ✅ 正确：workbench 是运行态数据管理页
-    const listUrl = `${baseUrl}/${appType}/workbench/${formUuid}?iframe=true`;
-    ```
-
-    > `viewUuid` 可选，从宜搭「数据管理」→「报表视图」页面的 URL 中获取，不传则使用默认视图。
 
 ---
 
