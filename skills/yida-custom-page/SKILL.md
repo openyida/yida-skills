@@ -128,6 +128,7 @@ node publish.js <appType> <formUuid> <源文件路径>
 | **样式** | 所有 css 必须写在 renderJsx 的方法中，通过 style 的方式引入 |
 | **`this` 上下文** | 所有导出函数中的 `this` 指向宜搭页面的 React 类实例 |
 | **禁止使用 `this.setState` 管理业务状态** | `this.setState` 已被覆盖，仅用于 `forceUpdate`（通过更新 `timestamp`） |
+| **JavaScript 版本** | 使用 ES2015 (ES6) 语法，不能高于 ES2015 版本 |
 | **必须定义 renderJsx 函数** | renderJsx 是宜搭自定义页面核心渲染函数，也是入口函数，必须严格定义，不要改为其他名称 |
 
 ### 文件结构
