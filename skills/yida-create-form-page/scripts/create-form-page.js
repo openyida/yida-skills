@@ -1612,9 +1612,9 @@ function applyFieldChanges(component, changes) {
     props.placeholder = i18n(changes.placeholder);
   }
 
-  // ── 特殊处理：options（需要转换为 dataSource 格式）
-  if (changes.options !== undefined && OPTION_FIELD_TYPES.indexOf(component.componentName) !== -1) {
-    var newDataSource = buildOptionDataSource(changes.options);
+  // ── 特殊处理：dataSource（选项类字段直接更新 dataSource）
+  if (changes.dataSource !== undefined && OPTION_FIELD_TYPES.indexOf(component.componentName) !== -1) {
+    var newDataSource = changes.dataSource;
     props.dataSource = newDataSource;
     if (props.defaultDataSource) {
       props.defaultDataSource.options = newDataSource;

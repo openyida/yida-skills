@@ -122,18 +122,29 @@ node publish.js <appType> <formUuid> <源文件路径>
 | 约束 | 说明 |
 | --- | --- |
 | **React 版本** | 必须兼容 **React 16**，禁止使用 Hooks（`useState`、`useEffect` 等） |
-| **单文件** | 所有代码写在一个文件中（如 `index.js`） |
+| **单文件** | 所有代码写在一个文件中（如 `index.js`）|
+| **三方包引入** | 禁止使用 `import/require` 语法，如需使用第三方库，必须通过 `this.utils.loadScript` 加载 CDN 脚本，参考 [yida-api.md](reference/yida-api.md) 的「工具类 API」章节。|
 | **函数导出格式** | 使用 `export function xxx() {}` 格式导出函数 |
 | **样式** | 所有 css 必须写在 renderJsx 的方法中，通过 style 的方式引入 |
 | **`this` 上下文** | 所有导出函数中的 `this` 指向宜搭页面的 React 类实例 |
 | **禁止使用 `this.setState` 管理业务状态** | `this.setState` 已被覆盖，仅用于 `forceUpdate`（通过更新 `timestamp`） |
+| **JavaScript 版本** | 使用 ES2015 (ES6) 语法，不能高于 ES2015 版本 |
 | **必须定义 renderJsx 函数** | renderJsx 是宜搭自定义页面核心渲染函数，也是入口函数，必须严格定义，不要改为其他名称 |
 
 ### 文件结构
 
-一个完整的宜搭自定义页面源文件必须包含以下三个导出函数和状态管理模块：
+**一个完整的宜搭自定义页面源文件必须包含：**
+- `_customState` 变量
+- getCustomState 函数
+- setCustomState 函数
+- forceUpdate 函数
+- didMount 函数
+- didUnmount 函数
+- renderJsx 函数
 
-```javascript
+以下是一个完整自定义页面示例，包含状态管理、生命周期钩子、渲染函数
+
+```jsx
 // ============================================================
 // 状态管理
 // ============================================================
@@ -193,6 +204,10 @@ export function didUnmount() {
   // 清理逻辑
 }
 
+export function handleSubmit(e) {
+  this.setCustomState({ submitted: true });
+  this.utils.toast({ title: '提交成功', type: 'success' });
+}
 // ============================================================
 // 渲染
 // ============================================================
@@ -210,6 +225,7 @@ export function renderJsx() {
       <div style={{ display: "none" }}>{timestamp}</div>
 
       {/* 页面内容写在这里 */}
+      <div onClick={(e) => {this.handleSubmit(e)}>提交</div>
     </div>
   );
 }
@@ -249,19 +265,7 @@ this.forceUpdate();
 
 ### 编码注意事项
 
-1. **箭头函数捕获 this**：同 react 的 render 函数一样，在 `renderJsx` 内部定义的事件处理函数中，**必须使用箭头函数**自动捕获 `this`：
-   ```javascript
-   export function renderJsx() {
-     // ✅ 正确：箭头函数自动捕获 this
-     const handleSubmit = () => {
-       this.setCustomState({ submitted: true });
-       this.utils.toast({ title: '提交成功', type: 'success' });
-     };
-     return <button onClick={handleSubmit}>提交</button>;
-   }
-   ```
-
-2. **自定义方法必须用 `export function` 定义**：凡是需要在方法内部使用 `this`（包括 `this.utils.yida.*`、`this.setCustomState` 等）的自定义方法，**必须且只能**使用 `export function 方法名() {}` 的形式定义，调用时使用 `this.方法名()`。**禁止**使用 `const fn = () => {}`、`const fn = function() {}` 等形式定义需要访问 `this` 的方法，这些形式无法被宜搭运行时正确绑定 `this`：
+1. **自定义方法必须用 `export function` 定义**：凡是需要在方法内部使用 `this`（包括 `this.utils.yida.*`、`this.setCustomState` 等）的自定义方法，**必须且只能**使用 `export function 方法名() {}` 的形式定义，调用时使用 `this.方法名()`。**禁止**使用 `const fn = () => {}`、`const fn = function() {}` 等形式定义需要访问 `this` 的方法，这些形式无法被宜搭运行时正确绑定 `this`：
    ```javascript
    // ✅ 正确：export function + this.方法名() 调用
    export function didMount() {
@@ -279,7 +283,7 @@ this.forceUpdate();
      this.utils.yida.searchFormDatas(...);  // 报错：this is undefined
    }
 
-   // ❌ 错误②：箭头函数/函数表达式形式，无法被宜搭运行时绑定 this，禁止使用
+   // ❌ 错误②：箭头函数/函数表达式形式，缺少 export，无法被宜搭运行时绑定 this，禁止使用
    const loadStatistics = () => {
      this.utils.yida.searchFormDatas(...);  // 报错：this is undefined
    };
@@ -287,6 +291,31 @@ this.forceUpdate();
      this.utils.yida.searchFormDatas(...);  // 报错：this is undefined
    };
    ```
+2. **【严格禁止】事件绑定必须使用箭头函数包裹**：在 `renderJsx` 中绑定任何事件处理器（`onClick`、`onChange`、`onSubmit` 等）时，**必须且只能**使用箭头函数 `(e) => { this.方法名(e) }` 的形式，**严禁**直接写 `this.方法名` 作为事件处理器，否则 `this` 会丢失导致运行时报错：
+
+   ```javascript
+   export function handleSubmit(e) {
+     this.setCustomState({ submitted: true });
+     this.utils.toast({ title: '提交成功', type: 'success' });
+   }
+
+   // ✅ 正确：箭头函数包裹，this 正确捕获
+   export function renderJsx() {
+     return <button onClick={(e) => { this.handleSubmit(e); }}>提交</button>;
+   }
+
+   // ❌ 错误①：直接传方法引用，this 丢失，运行时报错，绝对禁止！
+   export function renderJsx() {
+     return <button onClick={this.handleSubmit}>提交</button>;
+   }
+
+   // ❌ 错误②：使用 .bind(this) 绑定，虽然能运行但不符合规范，禁止使用！
+   export function renderJsx() {
+     return <button onClick={function() { this.handleSubmit(); }.bind(this)}>提交</button>;
+   }
+   ```
+
+   > **生成代码时的自检清单**：检查 `renderJsx` 中所有 `onClick`、`onChange`、`onSubmit` 等事件属性，确保每一个都是 `(e) => { this.xxx(e) }` 形式，不存在任何 `onClick={this.xxx}` 的写法。
 
 3. **输入法组合输入处理**：使用 `_isComposing` 标记配合 `compositionstart` / `compositionend` 事件，正确处理中文输入法的组合输入状态，避免输入过程中触发提交
 4. **定时器清理**：在 `didUnmount` 中必须清理所有通过 `setInterval` / `setTimeout` 创建的定时器，防止内存泄漏
@@ -297,7 +326,7 @@ this.forceUpdate();
 9. **输入框使用非受控组件**：在宜搭环境中，`<input>` 的 `value` 属性绑定状态后会触发重渲染导致输入异常。**正确做法**：使用 `defaultValue`，在 `onChange` 中更新 `_customState` 而不调用 `setCustomState`：
    ```javascript
    // ❌ 错误：受控组件，每次输入都触发重渲染导致无法输入
-   <input value={userAnswer} onChange={function(e) { self.setCustomState({ userAnswer: e.target.value }); }} />
+   <input value={userAnswer} onChange={function(e) { this.setCustomState({ userAnswer: e.target.value }); }} />
 
    // ✅ 正确：非受控组件，仅静默更新状态，不触发重渲染
    <input id="my-input" defaultValue="" onChange={function(e) { _customState.userAnswer = e.target.value; }} />

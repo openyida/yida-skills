@@ -1026,58 +1026,102 @@ export function someFunctionName() {
 
 ### router.push
 
-**描述**：页面路由跳转工具。支持两种常见方式：1.跳转到完整 URL，2.跳转到同一应用内的表单页或自定义页。
+**描述**：页面路由跳转工具，用于在宜搭应用内进行页面跳转。
 
-参数说明：
+#### 参数说明
 
-| 参数位置 | 说明                                              |
-| :------- | :------------------------------------------------ |
-| 参数 1   | 完整 URL，或同应用内页面 ID                       |
-| 参数 2   | 携带的跳转参数对象                                |
-| 参数 3   | 是否新开页面，`true` 为新开，`false` 为当前页跳转 |
-| 参数 4   | 是否是外部网址，仅在传完整 URL 时使用             |
+| 参数位置 | 参数名 | 类型 | 必填 | 说明 |
+| :------- | :----- | :--- | :--- | :--- |
+| 参数 1 | `target` | String | 是 | 跳转目标：同应用内的页面 ID（如 `FORM-XXX`）或完整 URL |
+| 参数 2 | `params` | Object | 否 | 携带的跳转参数对象，默认 `{}` |
+| 参数 3 | `newTab` | Boolean | 否 | 是否新开标签页，`true` 新开，`false` 当前页跳转，默认 `false` |
+| 参数 4 | `isExternal` | Boolean | 否 | 是否是外部网址，仅当参数 1 为完整 URL 时需要传 `true` |
 
-用法一：跳转完整 URL
+#### 使用场景与示例
+
+**场景一：跳转同应用内的表单页或自定义页（推荐）**
+
+当跳转目标与当前页面属于同一个宜搭应用时，直接传页面 ID 即可，无需手拼 URL。
 
 ```javascript
-/**
- * 参数1：完整 url
- * 参数2：携带跳转参数
- * 参数3：是否新页面打开，true / false
- * 参数4：是否是网址
- */
-this.utils.router.push('https://yeyi...', {}, true, true);
+// ✅ 正确：同应用内跳转，传页面 ID
+this.utils.router.push('FORM-XXX', {}, false);
+
+// ✅ 正确：带参数跳转
+this.utils.router.push('FORM-XXX', { id: '123', type: 'edit' }, false);
+
+// ✅ 正确：跳转到自定义页（PAGE-XXX）
+this.utils.router.push('PAGE-XXX', { mode: 'view' }, false);
+
+// ✅ 正确：新标签页打开
+this.utils.router.push('FORM-XXX', {}, true);
 ```
 
-用法二：跳转同应用内页面
+**场景二：跳转外部网址**
+
+跳转到宜搭应用外部的网址时，必须传第四个参数 `isExternal = true`。
 
 ```javascript
-/**
- * 参数1：表单页面 ID，必须是同一个应用内
- * 参数2：携带跳转参数
- * 参数3：是否新页面打开，true / false
- */
-this.utils.router.push('FORM-WC96669...', {}, true);
+// ✅ 正确：跳转外部网址，必须传第四个参数 true
+this.utils.router.push('https://www.example.com', {}, false, true);
+
+// ❌ 错误：跳转外部网址但未传第四个参数，会导致跳转失败
+this.utils.router.push('https://www.example.com', {}, false);
 ```
 
-推荐写法：
+#### 最佳实践
+
+1. **同应用内跳转优先使用页面 ID**：不要手拼完整 URL，直接使用 `FORM-XXX` 或 `PAGE-XXX`，让系统自动处理路由。
+
+2. **参数传递**：需要传递参数时，通过第二个参数 `params` 对象传递，目标页面可通过 `this.state.urlParams` 获取。
+
+   ```javascript
+   // 跳转时传参
+   this.utils.router.push('FORM-XXX', { orderId: '123', action: 'edit' }, false);
+   
+   // 目标页面获取参数
+   export function didMount() {
+     const orderId = this.state.urlParams.orderId;  // '123'
+     const action = this.state.urlParams.action;    // 'edit'
+   }
+   ```
+
+3. **是否新开标签页**：
+   - 管理系统内部页面切换，优先使用 `false`（当前页跳转），避免打开过多标签页
+   - 跳转到外部系统或需要保留当前页面状态时，使用 `true`（新标签页打开）
+
+#### 常见错误
 
 ```javascript
-// 同应用内跳转到后台管理页，当前页打开
-this.utils.router.push('FORM-XXX', {
-  isRenderNav: false,
-  corpid: 'dingxxxxxxxx'
-}, false);
+// ❌ 错误：跳转外部网址未传第四个参数
+this.utils.router.push('https://example.com', {}, false);
 
-// 跳转外部网址，当前页打开
+// ✅ 正确：跳转外部网址必须传 isExternal = true
 this.utils.router.push('https://example.com', {}, false, true);
+
+// ❌ 错误：同应用内跳转却手拼了完整 URL（容易出错，不推荐）
+this.utils.router.push('https://www.aliwork.com/APP_XXX/workbench/FORM-XXX', {}, false, true);
+
+// ✅ 正确：同应用内跳转直接传页面 ID
+this.utils.router.push('FORM-XXX', {}, false);
 ```
 
-使用建议：
+#### ⚠️ 重要提醒：禁止手拼宜搭 URL
 
-- 管理系统内部页面切换，优先使用 `false`，避免新开页面。
-- 当跳转目标是同应用内的自定义页或表单页时，优先传页面 ID，不要手拼完整 URL。
-- 当跳转目标是外部网址时，第四个参数传 `true`，明确告诉路由工具这是一个网址。
+**`aliwork.com` 是宜搭平台的域名，同应用内跳转永远不要手拼完整 URL！**
+
+```javascript
+// ❌ 绝对禁止：手拼宜搭 URL（包括 submission、workbench 等路径）
+this.utils.router.push('https://www.aliwork.com/APP_XXX/submission/FORM-XXX');
+this.utils.router.push('https://www.aliwork.com/APP_XXX/workbench/FORM-XXX');
+
+// ✅ 正确：直接传页面 ID，系统自动处理路由
+this.utils.router.push('FORM-XXX', {}, false);
+```
+
+**判断标准**：
+- 如果 URL 包含 `aliwork.com` → 这是宜搭应用内页面，**必须**使用页面 ID（`FORM-XXX` 或 `PAGE-XXX`）
+- 如果 URL 是其他域名（如 `example.com`）→ 这是外部网址，需要传第四个参数 `true`
 
 ---
 
