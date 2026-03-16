@@ -52,7 +52,7 @@ node .claude/skills/yida-create-form-page/scripts/create-form-page.js create <ap
 **示例（JSON 字符串，推荐）**：
 
 ```bash
-node .claude/skills/yida-create-form-page/scripts/create-form-page.js create "APP_XXX" "用户信息表" '[{"type":"TextField","label":"姓名","required":true},{"type":"SelectField","label":"部门","options":["技术部","产品部"]}]'
+node .claude/skills/yida-create-form-page/scripts/create-form-page.js create "APP_XXX" "用户信息表" '[{"type":"TextField","label":"姓名","required":true},{"type":"SelectField","label":"部门","dataSource":[{"text":{"zh_CN":"技术部","en_US":"技术部","type":"i18n"},"value":"技术部","sid":"serial_xxx","disable":false,"defaultChecked":false},{"text":{"zh_CN":"产品部","en_US":"产品部","type":"i18n"},"value":"产品部","sid":"serial_xxx","disable":false,"defaultChecked":false}]}]'
 ```
 **示例（JSON 文件）**：
 ```bash
@@ -104,7 +104,7 @@ node .claude/skills/yida-create-form-page/scripts/create-form-page.js update "AP
 ```json
 [
   { "type": "TextField", "label": "姓名", "required": true },
-  { "type": "SelectField", "label": "部门", "options": ["技术部", "产品部", "设计部"] },
+  { "type": "SelectField", "label": "部门", "dataSource": [{"text":{"zh_CN":"技术部","en_US":"技术部","type":"i18n"},"value":"技术部","sid":"serial_xxx","disable":false,"defaultChecked":false},{"text":{"zh_CN":"产品部","en_US":"产品部","type":"i18n"},"value":"产品部","sid":"serial_xxx","disable":false,"defaultChecked":false}] },
   { "type": "DateField", "label": "入职日期" },
   { "type": "NumberField", "label": "年龄" },
   { "type": "TableField", "label": "费用明细", "children": [
@@ -125,7 +125,7 @@ node .claude/skills/yida-create-form-page/scripts/create-form-page.js update "AP
 | `behavior` | String | 否 | 字段行为，`NORMAL`（正常，默认）/ `READONLY`（只读）/ `HIDDEN`（隐藏） |
 | `visibility` | String[] | 否 | 显示端，`["PC", "MOBILE"]`（默认）/ `["PC"]`（仅 PC）/ `["MOBILE"]`（仅移动端） |
 | `labelAlign` | String | 否 | 标签对齐方式，`top`（默认）/ `left` / `right` |
-| `options` | String[] | 条件必填 | 选项列表，选项类字段必填 |
+| `dataSource` | Array | 条件必填 | 选项数据源数组，**选项类字段（RadioField/SelectField/CheckboxField/MultiSelectField）必填**。每个元素是选项对象，格式详见下方各字段类型说明 |
 | `multiple` | Boolean | 否 | 是否多选，`EmployeeField`/`DepartmentSelectField`/`CountrySelectField`/`AssociationFormField` 可用 |
 | `children` | Object[] | 条件必填 | 子字段列表，`TableField` 必填 |
 | `associationForm` | Object | 条件必填 | 关联表单配置对象，`AssociationFormField` 必填，详见下方说明 |
@@ -169,24 +169,70 @@ node .claude/skills/yida-create-form-page/scripts/create-form-page.js update "AP
 | --- | --- | --- |
 | `dataSourceType` | `"custom"` | 数据源类型 |
 | `valueType` | `"custom"` | 值类型 |
+| `dataSource` | 数组 | 选项数据源数组，每个元素是选项对象 |
+| `defaultDataSource` | 对象 | 默认数据源配置，包含 `options` 数组 |
 
-**选项数据格式**：`dataSource` 和 `defaultDataSource.options` 中每个选项的结构如下，**`text.zh_CN` 和 `value` 必须是字符串，不能是对象**：
+**`dataSource` 数组元素结构**：
+
+| 属性 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `text` | Object | 是 | 选项显示文本，i18n 对象格式 |
+| `text.zh_CN` | String | 是 | 中文显示文本，**必须是字符串** |
+| `text.en_US` | String | 是 | 英文显示文本，**必须是字符串** |
+| `text.type` | String | 是 | 固定为 `"i18n"` |
+| `value` | String | 是 | 选项值，**必须是字符串** |
+| `sid` | String | 是 | 选项唯一标识，格式为 `serial_xxx` |
+| `disable` | Boolean | 否 | 是否禁用，默认 `false` |
+| `defaultChecked` | Boolean | 否 | 是否默认选中，默认 `false` |
+
+**`defaultDataSource` 对象结构**：
+
+| 属性 | 类型 | 说明 |
+| --- | --- | --- |
+| `complexType` | String | 固定为 `"custom"` |
+| `options` | Array | 选项数组，元素结构与 `dataSource` 相同 |
+| `formula` | String | 公式配置，默认空字符串 |
+| `url` | String | 数据源 URL，默认空字符串 |
+| `searchConfig` | Object | 搜索配置 |
+| `searchConfig.type` | String | 请求类型，固定为 `"JSONP"` |
+| `searchConfig.url` | String | 请求 URL，默认空字符串 |
+| `searchConfig.beforeFetch` | String | 请求前处理脚本，默认空字符串 |
+| `searchConfig.afterFetch` | String | 请求后处理脚本，默认空字符串 |
+
+**完整示例**：
 
 ```json
 {
-  "text": { "zh_CN": "选项一", "en_US": "选项一", "type": "i18n" },
-  "value": "选项一",
-  "sid": "serial_xxx",
-  "disable": false,
-  "defaultChecked": false
-}
-```
-
-❌ 错误格式（`text.zh_CN` 和 `value` 不能是 `{ label, value }` 对象）：
-```json
-{
-  "text": { "zh_CN": { "label": "选项一", "value": "选项一" }, "en_US": "New Option", "type": "i18n" },
-  "value": { "label": "选项一", "value": "选项一" }
+  "dataSourceType": "custom",
+  "dataSource": [
+    {
+      "text": { "zh_CN": "选项一", "en_US": "Option 1", "type": "i18n" },
+      "value": "选项一",
+      "sid": "serial_khe7yak4",
+      "disable": false,
+      "defaultChecked": false
+    }
+  ],
+  "defaultDataSource": {
+    "complexType": "custom",
+    "options": [
+      {
+        "text": { "zh_CN": "选项一", "en_US": "Option 1", "type": "i18n" },
+        "value": "选项一",
+        "sid": "serial_khe7yak4",
+        "disable": false,
+        "defaultChecked": false
+      }
+    ],
+    "formula": "",
+    "url": "",
+    "searchConfig": {
+      "type": "JSONP",
+      "url": "",
+      "beforeFetch": "",
+      "afterFetch": ""
+    }
+  }
 }
 ```
 
@@ -198,6 +244,30 @@ node .claude/skills/yida-create-form-page/scripts/create-form-page.js update "AP
 | `autoWidth` | `true` | 自动宽度 |
 | `filterLocal` | `true` | 本地过滤 |
 | `mode` | `"single"` / `"multiple"` | 选择模式 |
+| `dataSourceType` | `"custom"` | 数据源类型 |
+| `dataSource` | 数组 | 选项数据源数组，每个元素是选项对象 |
+| `defaultDataSource` | 对象 | 默认数据源配置，包含 `options` 数组 |
+
+**选项数据格式**：与 RadioField/CheckboxField 完全一致，每个选项对象包含以下属性：
+
+| 属性 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `text` | Object | 是 | 选项显示文本，i18n 对象格式 |
+| `text.zh_CN` | String | 是 | 中文显示文本，**必须是字符串** |
+| `text.en_US` | String | 是 | 英文显示文本，**必须是字符串** |
+| `text.type` | String | 是 | 固定为 `"i18n"` |
+| `value` | String | 是 | 选项值，**必须是字符串** |
+| `sid` | String | 是 | 选项唯一标识，格式为 `serial_xxx` |
+| `disable` | Boolean | 否 | 是否禁用，默认 `false` |
+| `defaultChecked` | Boolean | 否 | 是否默认选中，默认 `false` |
+
+**`defaultDataSource` 对象结构**：
+- `complexType`: `"custom"`
+- `options`: 选项数组，元素结构与 `dataSource` 相同
+- `formula`: 公式配置，默认空字符串
+- `url`: 数据源 URL，默认空字符串
+- `searchConfig`: 搜索配置对象，包含 `type`（固定 `"JSONP"`）、`url`、`beforeFetch`、`afterFetch`
+
 
 #### DateField
 
@@ -351,10 +421,10 @@ format 格式：
 ```json
 [
   { "action": "add", "field": { "type": "TextField", "label": "姓名", "required": true } },
-  { "action": "add", "field": { "type": "SelectField", "label": "部门", "options": ["技术部", "产品部"] }, "after": "姓名" },
+  { "action": "add", "field": { "type": "SelectField", "label": "部门", "dataSource": [{"text":{"zh_CN":"技术部","en_US":"技术部","type":"i18n"},"value":"技术部","sid":"serial_xxx","disable":false,"defaultChecked":false},{"text":{"zh_CN":"产品部","en_US":"产品部","type":"i18n"},"value":"产品部","sid":"serial_xxx","disable":false,"defaultChecked":false}] }, "after": "姓名" },
   { "action": "delete", "label": "备注" },
   { "action": "update", "label": "年龄", "changes": { "required": true, "placeholder": "请输入年龄" } },
-  { "action": "update", "label": "状态", "changes": { "label": "审批状态", "options": ["待审批", "已通过", "已拒绝"] } }
+  { "action": "update", "label": "状态", "changes": { "label": "审批状态", "dataSource": [{"text":{"zh_CN":"待审批","en_US":"待审批","type":"i18n"},"value":"待审批","sid":"serial_xxx","disable":false,"defaultChecked":false},{"text":{"zh_CN":"已通过","en_US":"已通过","type":"i18n"},"value":"已通过","sid":"serial_xxx","disable":false,"defaultChecked":false},{"text":{"zh_CN":"已拒绝","en_US":"已拒绝","type":"i18n"},"value":"已拒绝","sid":"serial_xxx","disable":false,"defaultChecked":false}] } }
 ]
 ```
 
@@ -373,7 +443,7 @@ format 格式：
 | `label` | String | 修改字段标签 |
 | `required` | Boolean | 修改是否必填 |
 | `placeholder` | String | 修改占位提示 |
-| `options` | String[] | 修改选项列表（选项类字段：RadioField/SelectField/CheckboxField/MultiSelectField） |
+| `dataSource` | Array | 修改选项数据源（选项类字段：RadioField/SelectField/CheckboxField/MultiSelectField），每个元素是选项对象，格式见 [RadioField 选项格式](#radiofield--checkboxfield) |
 | `multiple` | Boolean | 修改是否多选（EmployeeField/DepartmentSelectField/CountrySelectField） |
 | `behavior` | String | 修改字段行为：`NORMAL` / `READONLY` / `HIDDEN` |
 | `visibility` | String[] | 修改显示端：`["PC", "MOBILE"]` / `["PC"]` / `["MOBILE"]` |
