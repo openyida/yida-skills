@@ -1106,6 +1106,23 @@ this.utils.router.push('https://www.aliwork.com/APP_XXX/workbench/FORM-XXX', {},
 this.utils.router.push('FORM-XXX', {}, false);
 ```
 
+#### ⚠️ 重要提醒：禁止手拼宜搭 URL
+
+**`aliwork.com` 是宜搭平台的域名，同应用内跳转永远不要手拼完整 URL！**
+
+```javascript
+// ❌ 绝对禁止：手拼宜搭 URL（包括 submission、workbench 等路径）
+this.utils.router.push('https://www.aliwork.com/APP_XXX/submission/FORM-XXX');
+this.utils.router.push('https://www.aliwork.com/APP_XXX/workbench/FORM-XXX');
+
+// ✅ 正确：直接传页面 ID，系统自动处理路由
+this.utils.router.push('FORM-XXX', {}, false);
+```
+
+**判断标准**：
+- 如果 URL 包含 `aliwork.com` → 这是宜搭应用内页面，**必须**使用页面 ID（`FORM-XXX` 或 `PAGE-XXX`）
+- 如果 URL 是其他域名（如 `example.com`）→ 这是外部网址，需要传第四个参数 `true`
+
 ---
 
 ### previewImage
