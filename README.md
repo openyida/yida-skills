@@ -40,13 +40,15 @@
 
 ### 第一步：安装技能
 
-**目前 skills 还未发布到市场，先手动下载 yida-skills.zip，然后：**
+**下载技能包**：[yida-skills.zip](https://github.com/openyida/yida-skills/releases/download/v1.0.0/yida-skills.zip)
 
-* 悟空 (Wukong): 直接上传技能，选择 yida-skills.zip
+**安装方式**：
 
-* OpenCode: 手动解压到 ~/.opencode/skills/
+- **悟空 (Wukong)**：直接上传技能，选择下载的 yida-skills.zip
 
-* Claude Code: 手动解压到 ~/.claudecode/skills/
+- **OpenCode**：解压到 `~/.opencode/skills/`
+
+- **Claude Code**：解压到 `~/.claudecode/skills/`
 
 * Cursor: 手动解压到 ~/.cursor/skills/
 
