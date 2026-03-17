@@ -40,25 +40,37 @@
 
 ### 第一步：安装技能
 
-目前还未发布到市场，先手动下载 yida-skills.zip，然后：
+**目前 skills 还未发布到市场，先手动下载 yida-skills.zip，然后：**
 
-悟空 (Wukong): 直接上传技能，选择 yida-skills.zip
-OpenCode: 手动解压到 ~/.opencode/skills/
-Claude Code: 手动解压到 ~/.claudecode/skills/
-Cursor: 手动解压到 ~/.cursor/skills/
-Qoder: 手动解压到 ~/.qoder/skills/
-iFlow: 手动解压到 ~/.iflow/skills/
-Aone Copilot: 手动解压到 ~/.aone-copilot/skills/
+* 悟空 (Wukong): 直接上传技能，选择 yida-skills.zip
+
+* OpenCode: 手动解压到 ~/.opencode/skills/
+
+* Claude Code: 手动解压到 ~/.claudecode/skills/
+
+* Cursor: 手动解压到 ~/.cursor/skills/
+
+* Qoder: 手动解压到 ~/.qoder/skills/
+
+* iFlow: 手动解压到 ~/.iflow/skills/
+
+* Aone Copilot: 手动解压到 ~/.aone-copilot/skills/
 
 ---
 
 ### 第二步：使用
 
-直接对话：
+**1. 悟空**
+
+直接对话即可：
 
 - `帮我创建一个访客系统应用`
 - `帮我搭建一个生日祝福小游戏应用`
 - `帮我搭建个人薪资计算器应用`
+
+**2. 其他 AI 编程工具**
+
+在任意地方创建一个空文件夹，用 AI 编程工具打开该文件夹，开始对话即可。
 
 ---
 
