@@ -1605,6 +1605,17 @@ function applyFieldChanges(component, changes) {
     }
   }
 
+  // ── 特殊处理：aiValidation（AI 智能校验，操作 validation 数组）
+  // aiValidation 为字符串时，注入 {"type":"ai","param":"<提示词>"}；为 null/false 时移除
+  if (changes.aiValidation !== undefined) {
+    props.validation = (props.validation || []).filter(function (rule) {
+      return rule.type !== "ai";
+    });
+    if (changes.aiValidation) {
+      props.validation.push({ type: "ai", param: changes.aiValidation });
+    }
+  }
+
   // ── 特殊处理：placeholder（需要 i18n 包装）
   if (changes.placeholder !== undefined) {
     props.placeholder = i18n(changes.placeholder);

@@ -375,6 +375,7 @@ format 格式：
 | --- | --- | --- |
 | `label` | String | 修改字段标签 |
 | `required` | Boolean | 修改是否必填 |
+| `aiValidation` | String \| null | 设置或移除 AI 智能校验提示词（支持 `TextField`、`TextareaField`、`NumberField`）；传 `null` 或 `false` 可移除已有的 AI 校验 |
 | `placeholder` | String | 修改占位提示 |
 | `options` | String[] | 修改选项列表（选项类字段：RadioField/SelectField/CheckboxField/MultiSelectField） |
 | `multiple` | Boolean | 修改是否多选（EmployeeField/DepartmentSelectField/CountrySelectField） |
