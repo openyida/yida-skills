@@ -128,7 +128,6 @@ node publish.js <appType> <formUuid> <源文件路径>
 | **样式** | 所有 css 必须写在 renderJsx 的方法中，通过 style 的方式引入 |
 | **`this` 上下文** | 所有导出函数中的 `this` 指向宜搭页面的 React 类实例 |
 | **禁止使用 `this.setState` 管理业务状态** | `this.setState` 已被覆盖，仅用于 `forceUpdate`（通过更新 `timestamp`） |
-| **JavaScript 版本** | 使用 ES2015 (ES6) 语法，不能高于 ES2015 版本 |
 | **必须定义 renderJsx 函数** | renderJsx 是宜搭自定义页面核心渲染函数，也是入口函数，必须严格定义，不要改为其他名称 |
 
 ### 文件结构
@@ -144,7 +143,7 @@ node publish.js <appType> <formUuid> <源文件路径>
 
 以下是一个完整自定义页面示例，包含状态管理、生命周期钩子、渲染函数
 
-```jsx
+```javascript
 // ============================================================
 // 状态管理
 // ============================================================
@@ -204,10 +203,6 @@ export function didUnmount() {
   // 清理逻辑
 }
 
-export function handleSubmit(e) {
-  this.setCustomState({ submitted: true });
-  this.utils.toast({ title: '提交成功', type: 'success' });
-}
 // ============================================================
 // 渲染
 // ============================================================
@@ -225,7 +220,6 @@ export function renderJsx() {
       <div style={{ display: "none" }}>{timestamp}</div>
 
       {/* 页面内容写在这里 */}
-      <div onClick={(e) => {this.handleSubmit(e)}>提交</div>
     </div>
   );
 }
@@ -283,7 +277,7 @@ this.forceUpdate();
      this.utils.yida.searchFormDatas(...);  // 报错：this is undefined
    }
 
-   // ❌ 错误②：箭头函数/函数表达式形式，缺少 export，无法被宜搭运行时绑定 this，禁止使用
+   // ❌ 错误②：箭头函数/函数表达式形式，无法被宜搭运行时绑定 this，禁止使用
    const loadStatistics = () => {
      this.utils.yida.searchFormDatas(...);  // 报错：this is undefined
    };
@@ -291,33 +285,82 @@ this.forceUpdate();
      this.utils.yida.searchFormDatas(...);  // 报错：this is undefined
    };
    ```
-2. **【严格禁止】事件绑定必须使用箭头函数包裹**：在 `renderJsx` 中绑定任何事件处理器（`onClick`、`onChange`、`onSubmit` 等）时，**必须且只能**使用箭头函数 `(e) => { this.方法名(e) }` 的形式，**严禁**直接写 `this.方法名` 作为事件处理器，否则 `this` 会丢失导致运行时报错：
+2. 事件绑定说明：**同 React 事件绑定中的 this 处理一样**：在 `renderJsx` 中绑定事件处理器时，**必须使用箭头函数**来捕获 `this`，事件的回调方法需要使用 export function 定义：
 
    ```javascript
    export function handleSubmit(e) {
      this.setCustomState({ submitted: true });
      this.utils.toast({ title: '提交成功', type: 'success' });
-   }
-
-   // ✅ 正确：箭头函数包裹，this 正确捕获
+   };
    export function renderJsx() {
-     return <button onClick={(e) => { this.handleSubmit(e); }}>提交</button>;
-   }
-
-   // ❌ 错误①：直接传方法引用，this 丢失，运行时报错，绝对禁止！
-   export function renderJsx() {
-     return <button onClick={this.handleSubmit}>提交</button>;
-   }
-
-   // ❌ 错误②：使用 .bind(this) 绑定，虽然能运行但不符合规范，禁止使用！
-   export function renderJsx() {
-     return <button onClick={function() { this.handleSubmit(); }.bind(this)}>提交</button>;
+     return <button onClick={(e) => {this.handleSubmit(e)}}>提交</button>;
    }
    ```
 
-   > **生成代码时的自检清单**：检查 `renderJsx` 中所有 `onClick`、`onChange`、`onSubmit` 等事件属性，确保每一个都是 `(e) => { this.xxx(e) }` 形式，不存在任何 `onClick={this.xxx}` 的写法。
+3. **外部 JS 库引入**：宜搭不支持直接引用外部 CDN，必须通过 `this.utils.loadScript(url)` 动态加载。外部库需使用 `g.alicdn.com/code/lib` 下的地址。支持三种加载模式：
 
-3. **输入法组合输入处理**：使用 `_isComposing` 标记配合 `compositionstart` / `compositionend` 事件，正确处理中文输入法的组合输入状态，避免输入过程中触发提交
+   - **单库加载**：直接传入 URL，在 `.then()` 中使用库，`.catch()` 处理加载失败：
+     ```javascript
+     export function didMount() {
+       this.utils.loadScript('https://g.alicdn.com/code/lib/echarts/5.4.3/echarts.min.js')
+         .then(() => {
+           const chart = echarts.init(this.$('div_kchart'));
+           chart.setOption({ /* ... */ });
+         })
+         .catch(() => {
+           this.utils.toast({ title: '库加载失败，请刷新重试', type: 'error' });
+         });
+     }
+     ```
+
+   - **多库链式加载**（有依赖顺序时使用）：
+     ```javascript
+     export function didMount() {
+       this.utils.loadScript('https://g.alicdn.com/code/lib/echarts/5.4.3/echarts.min.js')
+         .then(() => this.utils.loadScript('https://g.alicdn.com/code/lib/echarts/5.4.3/theme/macarons.js'))
+         .then(() => {
+           const chart = echarts.init(this.$('div_kchart'), 'macarons');
+         })
+         .catch(() => {
+           this.utils.toast({ title: '库加载失败，请刷新重试', type: 'error' });
+         });
+     }
+     ```
+
+   - **Combo 组合加载**（推荐，减少 HTTP 请求）：使用 `??` 语法一次性加载多个文件，路径间用逗号分隔：
+     ```javascript
+     export function didMount() {
+       const comboUrl = 'https://g.alicdn.com/??code/lib/echarts/5.4.3/echarts.min.js,code/lib/echarts/5.4.3/theme/macarons.js,code/lib/moment/2.29.4/moment.min.js';
+       this.utils.loadScript(comboUrl)
+         .then(() => {
+           const chart = echarts.init(this.$('div_kchart'), 'macarons');
+         })
+         .catch(() => {
+           this.utils.toast({ title: '库加载失败，请刷新重试', type: 'error' });
+         });
+     }
+     ```
+
+   - **防重复加载**：通过检查全局变量避免重复加载（页面重渲染时 `didMount` 可能多次触发）：
+     ```javascript
+     export function didMount() {
+       if (window.echarts) {
+         this.initChart();
+         return;
+       }
+       this.utils.loadScript('https://g.alicdn.com/code/lib/echarts/5.4.3/echarts.min.js')
+         .then(() => { this.initChart(); })
+         .catch(() => { this.utils.toast({ title: '库加载失败', type: 'error' }); });
+     }
+     export function initChart() {
+       const chart = echarts.init(this.$('div_kchart'));
+       chart.setOption({ /* ... */ });
+     }
+     ```
+
+   完整的常用库地址和更多示例参考 [yida-api.md](reference/yida-api.md) 的「loadScript」章节。
+
+4. **输入法组合输入处理**：使用 `_isComposing` 标记配合 `compositionstart` / `compositionend` 事件，正确处理中文输入法的组合输入状态，避免输入过程中触发提交
 4. **定时器清理**：在 `didUnmount` 中必须清理所有通过 `setInterval` / `setTimeout` 创建的定时器，防止内存泄漏
 5. **错误处理**：所有 API 调用（`this.utils.yida.*`、`fetch`）必须使用 `.catch()` 处理异常，并通过 `this.utils.toast({ title: message, type: 'error' })` 向用户展示错误提示
 6. **样式方式**：所有样式通过 JavaScript 对象定义（内联样式），在 `renderJsx` 中通过 `style` 属性应用，不使用外部 CSS 文件

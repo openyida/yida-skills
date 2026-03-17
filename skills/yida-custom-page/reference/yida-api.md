@@ -970,23 +970,146 @@ export function someFunctionName() {
 
 ### loadScript
 
-**描述**：动态加载远程 JavaScript 脚本。
+**描述**：动态加载远程 JavaScript 脚本。宜搭不支持直接在页面中引用外部 CDN，必须通过此 API 动态加载。
 
 **参数**：
 
 | 参数名 | 类型 | 是否必填 | 说明 |
 | :--- | :--- | :--- | :--- |
-| url | String | 是 | 脚本 URL 地址 |
+| url | String | 是 | 脚本 URL 地址，推荐使用 `g.alicdn.com/code/lib` 下的地址 |
 
-**返回值**：`Promise` - 加载完成后 resolve
+**返回值**：`Promise` - 加载完成后 resolve，加载失败时 reject
 
-**请求示例**：
+---
+
+#### 外部 JS 库仓库地址
+
+宜搭的外部引用仓库需要使用 `g.alicdn.com/code/lib` 下的地址，常用库示例：
+
+| 库 | URL |
+| :--- | :--- |
+| ECharts 5.4.3 | `https://g.alicdn.com/code/lib/echarts/5.4.3/echarts.min.js` |
+| ECharts macarons 主题 | `https://g.alicdn.com/code/lib/echarts/5.4.3/theme/macarons.js` |
+| ECharts dark 主题 | `https://g.alicdn.com/code/lib/echarts/5.4.3/theme/dark.js` |
+| moment.js 2.29.4 | `https://g.alicdn.com/code/lib/moment/2.29.4/moment.min.js` |
+| QRCode.js 1.0.0 | `https://g.alicdn.com/code/lib/qrcodejs/1.0.0/qrcode.min.js` |
+
+---
+
+#### Combo 组合加载（推荐）
+
+`g.alicdn.com` 支持 Combo 语法，可以**一次请求加载多个文件**，减少 HTTP 请求数量，提升加载速度。
+
+**语法格式**：使用 `??` 作为分隔符，多个文件路径用逗号 `,` 连接：
+
+```
+https://g.alicdn.com/??路径1,路径2,路径3
+```
+
+**示例**：
+
+```javascript
+// 一次性加载 ECharts 主库 + macarons 主题 + moment.js
+const comboUrl = 'https://g.alicdn.com/??code/lib/echarts/5.4.3/echarts.min.js,code/lib/echarts/5.4.3/theme/macarons.js,code/lib/moment/2.29.4/moment.min.js';
+```
+
+> Combo 功能由 Tengine（阿里巴巴基于 Nginx 开发的 Web 服务器）提供支持，注意路径中不包含域名部分。
+
+---
+
+#### 使用示例
+
+**示例 1：单库加载（带错误处理）**
+
+```javascript
+export function didMount() {
+  this.utils.loadScript('https://g.alicdn.com/code/lib/echarts/5.4.3/echarts.min.js')
+    .then(() => {
+      const chart = echarts.init(this.$('div_kchart'));
+      chart.setOption({
+        title: { text: '示例图表' },
+        xAxis: { data: ['A', 'B', 'C'] },
+        yAxis: {},
+        series: [{ type: 'bar', data: [10, 20, 30] }],
+      });
+    })
+    .catch((err) => {
+      this.utils.toast({ title: '库加载失败，请刷新重试', type: 'error' });
+    });
+}
+```
+
+**示例 2：多库依赖加载（链式调用）**
+
+当库之间存在依赖关系时（如主题依赖主库），使用链式 `.then()` 保证加载顺序：
+
+```javascript
+export function didMount() {
+  // 先加载 ECharts 主库，再加载主题
+  this.utils.loadScript('https://g.alicdn.com/code/lib/echarts/5.4.3/echarts.min.js')
+    .then(() => this.utils.loadScript('https://g.alicdn.com/code/lib/echarts/5.4.3/theme/macarons.js'))
+    .then(() => {
+      // 所有依赖已加载，可以使用 macarons 主题
+      const chart = echarts.init(this.$('div_kchart'), 'macarons');
+    })
+    .catch((err) => {
+      this.utils.toast({ title: '库加载失败，请刷新重试', type: 'error' });
+    });
+}
+```
+
+**示例 3：Combo 组合加载（推荐，减少请求数）**
+
+```javascript
+export function didMount() {
+  // 使用 Combo 一次性加载多个库
+  const comboUrl = 'https://g.alicdn.com/??code/lib/echarts/5.4.3/echarts.min.js,code/lib/echarts/5.4.3/theme/macarons.js,code/lib/moment/2.29.4/moment.min.js';
+  this.utils.loadScript(comboUrl)
+    .then(() => {
+      // ECharts + macarons 主题 + moment.js 全部加载完成
+      const chart = echarts.init(this.$('div_kchart'), 'macarons');
+      chart.setOption({ /* ... */ });
+    })
+    .catch((err) => {
+      this.utils.toast({ title: '库加载失败，请刷新重试', type: 'error' });
+    });
+}
+```
+
+**示例 4：防止重复加载**
+
+页面可能因重渲染多次触发 `didMount`，通过检查全局变量避免重复加载：
+
+```javascript
+export function didMount() {
+  // 如果已加载则直接初始化，跳过加载步骤
+  if (window.echarts) {
+    this.initChart();
+    return;
+  }
+
+  this.utils.loadScript('https://g.alicdn.com/code/lib/echarts/5.4.3/echarts.min.js')
+    .then(() => {
+      this.initChart();
+    })
+    .catch((err) => {
+      this.utils.toast({ title: '库加载失败，请刷新重试', type: 'error' });
+    });
+}
+
+export function initChart() {
+  const chart = echarts.init(this.$('div_kchart'));
+  chart.setOption({ /* ... */ });
+}
+```
+
+**示例 5：加载 QRCode 生成二维码**
 
 ```javascript
 export function didMount() {
   this.utils.loadScript('https://g.alicdn.com/code/lib/qrcodejs/1.0.0/qrcode.min.js')
     .then(() => {
-      const qrcode = new QRCode(document.getElementById('qrcode'), {
+      new QRCode(document.getElementById('qrcode'), {
         text: 'https://www.aliwork.com',
         width: 128,
         height: 128,
@@ -994,6 +1117,9 @@ export function didMount() {
         colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.H,
       });
+    })
+    .catch((err) => {
+      this.utils.toast({ title: '二维码库加载失败', type: 'error' });
     });
 }
 ```
@@ -1026,102 +1152,58 @@ export function someFunctionName() {
 
 ### router.push
 
-**描述**：页面路由跳转工具，用于在宜搭应用内进行页面跳转。
+**描述**：页面路由跳转工具。支持两种常见方式：1.跳转到完整 URL，2.跳转到同一应用内的表单页或自定义页。
 
-#### 参数说明
+参数说明：
 
-| 参数位置 | 参数名 | 类型 | 必填 | 说明 |
-| :------- | :----- | :--- | :--- | :--- |
-| 参数 1 | `target` | String | 是 | 跳转目标：同应用内的页面 ID（如 `FORM-XXX`）或完整 URL |
-| 参数 2 | `params` | Object | 否 | 携带的跳转参数对象，默认 `{}` |
-| 参数 3 | `newTab` | Boolean | 否 | 是否新开标签页，`true` 新开，`false` 当前页跳转，默认 `false` |
-| 参数 4 | `isExternal` | Boolean | 否 | 是否是外部网址，仅当参数 1 为完整 URL 时需要传 `true` |
+| 参数位置 | 说明                                              |
+| :------- | :------------------------------------------------ |
+| 参数 1   | 完整 URL，或同应用内页面 ID                       |
+| 参数 2   | 携带的跳转参数对象                                |
+| 参数 3   | 是否新开页面，`true` 为新开，`false` 为当前页跳转 |
+| 参数 4   | 是否是外部网址，仅在传完整 URL 时使用             |
 
-#### 使用场景与示例
-
-**场景一：跳转同应用内的表单页或自定义页（推荐）**
-
-当跳转目标与当前页面属于同一个宜搭应用时，直接传页面 ID 即可，无需手拼 URL。
+用法一：跳转完整 URL
 
 ```javascript
-// ✅ 正确：同应用内跳转，传页面 ID
-this.utils.router.push('FORM-XXX', {}, false);
-
-// ✅ 正确：带参数跳转
-this.utils.router.push('FORM-XXX', { id: '123', type: 'edit' }, false);
-
-// ✅ 正确：跳转到自定义页（PAGE-XXX）
-this.utils.router.push('PAGE-XXX', { mode: 'view' }, false);
-
-// ✅ 正确：新标签页打开
-this.utils.router.push('FORM-XXX', {}, true);
+/**
+ * 参数1：完整 url
+ * 参数2：携带跳转参数
+ * 参数3：是否新页面打开，true / false
+ * 参数4：是否是网址
+ */
+this.utils.router.push('https://yeyi...', {}, true, true);
 ```
 
-**场景二：跳转外部网址**
-
-跳转到宜搭应用外部的网址时，必须传第四个参数 `isExternal = true`。
+用法二：跳转同应用内页面
 
 ```javascript
-// ✅ 正确：跳转外部网址，必须传第四个参数 true
-this.utils.router.push('https://www.example.com', {}, false, true);
-
-// ❌ 错误：跳转外部网址但未传第四个参数，会导致跳转失败
-this.utils.router.push('https://www.example.com', {}, false);
+/**
+ * 参数1：表单页面 ID，必须是同一个应用内
+ * 参数2：携带跳转参数
+ * 参数3：是否新页面打开，true / false
+ */
+this.utils.router.push('FORM-WC96669...', {}, true);
 ```
 
-#### 最佳实践
-
-1. **同应用内跳转优先使用页面 ID**：不要手拼完整 URL，直接使用 `FORM-XXX` 或 `PAGE-XXX`，让系统自动处理路由。
-
-2. **参数传递**：需要传递参数时，通过第二个参数 `params` 对象传递，目标页面可通过 `this.state.urlParams` 获取。
-
-   ```javascript
-   // 跳转时传参
-   this.utils.router.push('FORM-XXX', { orderId: '123', action: 'edit' }, false);
-   
-   // 目标页面获取参数
-   export function didMount() {
-     const orderId = this.state.urlParams.orderId;  // '123'
-     const action = this.state.urlParams.action;    // 'edit'
-   }
-   ```
-
-3. **是否新开标签页**：
-   - 管理系统内部页面切换，优先使用 `false`（当前页跳转），避免打开过多标签页
-   - 跳转到外部系统或需要保留当前页面状态时，使用 `true`（新标签页打开）
-
-#### 常见错误
+推荐写法：
 
 ```javascript
-// ❌ 错误：跳转外部网址未传第四个参数
-this.utils.router.push('https://example.com', {}, false);
+// 同应用内跳转到后台管理页，当前页打开
+this.utils.router.push('FORM-XXX', {
+  isRenderNav: false,
+  corpid: 'dingxxxxxxxx'
+}, false);
 
-// ✅ 正确：跳转外部网址必须传 isExternal = true
+// 跳转外部网址，当前页打开
 this.utils.router.push('https://example.com', {}, false, true);
-
-// ❌ 错误：同应用内跳转却手拼了完整 URL（容易出错，不推荐）
-this.utils.router.push('https://www.aliwork.com/APP_XXX/workbench/FORM-XXX', {}, false, true);
-
-// ✅ 正确：同应用内跳转直接传页面 ID
-this.utils.router.push('FORM-XXX', {}, false);
 ```
 
-#### ⚠️ 重要提醒：禁止手拼宜搭 URL
+使用建议：
 
-**`aliwork.com` 是宜搭平台的域名，同应用内跳转永远不要手拼完整 URL！**
-
-```javascript
-// ❌ 绝对禁止：手拼宜搭 URL（包括 submission、workbench 等路径）
-this.utils.router.push('https://www.aliwork.com/APP_XXX/submission/FORM-XXX');
-this.utils.router.push('https://www.aliwork.com/APP_XXX/workbench/FORM-XXX');
-
-// ✅ 正确：直接传页面 ID，系统自动处理路由
-this.utils.router.push('FORM-XXX', {}, false);
-```
-
-**判断标准**：
-- 如果 URL 包含 `aliwork.com` → 这是宜搭应用内页面，**必须**使用页面 ID（`FORM-XXX` 或 `PAGE-XXX`）
-- 如果 URL 是其他域名（如 `example.com`）→ 这是外部网址，需要传第四个参数 `true`
+- 管理系统内部页面切换，优先使用 `false`，避免新开页面。
+- 当跳转目标是同应用内的自定义页或表单页时，优先传页面 ID，不要手拼完整 URL。
+- 当跳转目标是外部网址时，第四个参数传 `true`，明确告诉路由工具这是一个网址。
 
 ---
 
