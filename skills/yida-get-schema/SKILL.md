@@ -36,14 +36,14 @@ metadata:
 **场景**：获取表单的完整 Schema 结构
 **命令**：
 ```bash
-node .claude/skills/yida-get-schema/scripts/get-schema.js APP_XXX FORM-XXX
+yidacli get-schema APP_XXX FORM-XXX
 ```
 **输出**：完整的 Schema JSON，包含 pages、componentsMap 等
 
 ## 使用方式
 
 ```bash
-node .claude/skills/yida-get-schema/scripts/get-schema.js <appType> <formUuid>
+yidacli get-schema <appType> <formUuid>
 ```
 
 **参数说明**：
@@ -56,7 +56,7 @@ node .claude/skills/yida-get-schema/scripts/get-schema.js <appType> <formUuid>
 **示例**：
 
 ```bash
-node .claude/skills/yida-get-schema/scripts/get-schema.js "APP_XXX" "FORM-XXX"
+yidacli get-schema "APP_XXX" "FORM-XXX"
 ```
 
 **输出**：日志输出到 stderr，Schema JSON 输出到 stdout。
@@ -68,23 +68,20 @@ node .claude/skills/yida-get-schema/scripts/get-schema.js "APP_XXX" "FORM-XXX"
 
 ## 调用流程
 
-1. 读取项目根目录的 `.cache/cookies.json` 获取登录态；若不存在则自动调用 `login.py` 触发扫码登录
+1. 读取项目根目录的 `.cache/cookies.json` 获取登录态；若不存在则自动触发扫码登录
 2. 调用 `getFormSchema` 接口获取表单 Schema；根据响应体 `errorCode` 自动处理异常（详见 `yida-login` 技能文档「错误处理机制」章节）
 3. 将 Schema 输出到 stdout
 
 ## 文件结构
 
 ```
-get-schema/
-├── SKILL.md                      # 本文档
-├── getFormSchema.ts              # 接口类型定义参考
-└── scripts/
-    └── get-schema.js             # Schema 获取脚本
+yida-get-schema/
+└── SKILL.md                      # 本文档
 ```
 
 ## 接口说明
 
-`getFormSchema` 接口的完整参数、返回值和错误处理机制，请参考 `reference/yida-api.md` 文档中的「表单设计类 API」章节。
+`getFormSchema` 接口的完整参数、返回值和错误处理机制，请参考 `../../reference/yida-api.md` 文档中的「表单设计类 API」章节。
 
 ## 与其他技能配合
 

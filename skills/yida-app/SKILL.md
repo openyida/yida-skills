@@ -104,7 +104,7 @@ metadata:
 调用 `yida-create-app` 技能创建宜搭应用，获取 `appType`。
 
 ```bash
-node .claude/skills/yida-create-app/scripts/create-app.js "<应用名称>" "[描述]"
+yidacli create-app "<应用名称>" "[描述]"
 ```
 
 **输出**：`appType`（如 `APP_XXXXXX`），用 markdown 记录到 prd 文件夹下文档备用。
@@ -120,7 +120,7 @@ node .claude/skills/yida-create-app/scripts/create-app.js "<应用名称>" "[描
 确认 corpId 一致后，调用 `yida-create-page` 技能：
 
 ```bash
-node .claude/skills/yida-create-page/scripts/create-page.js "<appType>" "<页面名称>"
+yidacli create-page "<appType>" "<页面名称>"
 ```
 
 **输出**：`pageId`（如 `FORM-XXXXXX`），记录到 prd 文档备用。
@@ -147,8 +147,8 @@ node .claude/skills/yida-create-page/scripts/create-page.js "<appType>" "<页面
 | baseUrl | https://ding.aliwork.com |
 
 > 💡 **提示**：
-> - `corpId` 由 `create-app.js` 自动写入，用于组织一致性校验
-> - 如果登录态变更或创建新应用，`create-app.js` 会自动更新本表格
+> - `corpId` 由 `yidacli create-app` 自动写入，用于组织一致性校验
+> - 如果登录态变更或创建新应用，`yidacli create-app` 会自动更新本表格
 
 ## 功能需求
 - 描述页面的核心功能、交互逻辑、业务规则
@@ -207,7 +207,7 @@ node .claude/skills/yida-create-page/scripts/create-page.js "<appType>" "<页面
 #### 5.2 创建表单
 
 ```bash
-node .claude/skills/yida-create-form-page/scripts/create-form-page.js create "<appType>" "<表单名称>" .claude/skills/yida-create-form-page/scripts/fields.json
+yidacli create-form create "<appType>" "<表单名称>" .cache/fields.json
 ```
 
 **输出**：`formUuid` 和各字段的 `fieldId`（如 `textField_xxxxxxxx`）。
@@ -290,15 +290,13 @@ node .claude/skills/yida-create-form-page/scripts/create-form-page.js create "<a
 调用 `yida-publish-page` 技能，将源码编译并部署到宜搭平台。
 
 ```bash
-cd .claude/skills/yida-publish-page/scripts
-npm install  # 首次需要安装依赖
-node publish.js <appType> <formUuid> <源文件路径>
+yidacli publish <源文件路径> <appType> <formUuid>
 ```
 
 **示例**：
 
 ```bash
-node publish.js APP_XXX FORM-XXXXXX pages/src/xxx.js
+yidacli publish pages/src/xxx.js APP_XXX FORM-XXXXXX
 ```
 
 **发布流程**：
@@ -357,11 +355,11 @@ node publish.js APP_XXX FORM-XXXXXX pages/src/xxx.js
 ### 常见问题
 
 **Q：发布时提示登录失效怎么办？**
-A：使用 `yida-logout` 清空 Cookie 缓存，再重新执行发布命令，会自动触发扫码登录。
+A：使用 `yidacli logout` 清空 Cookie 缓存，再重新执行发布命令，会自动触发扫码登录。
 
 ```bash
-echo -n "" > .cache/cookies.json
-node publish.js ...
+yidacli logout
+yidacli publish ...
 ```
 
 **Q：一直登录失败怎么办？**

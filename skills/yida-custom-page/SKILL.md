@@ -46,7 +46,7 @@ metadata:
 **依赖**：需先安装 yida-publish-page 依赖
 **命令**：
 ```bash
-cd .claude/skills/yida-publish-page/scripts && npm install
+# yidacli 已包含所有依赖，无需单独安装
 node babel-transform/transform.js pages/src/my-page.js
 ```
 
@@ -54,7 +54,7 @@ node babel-transform/transform.js pages/src/my-page.js
 **场景**：编译并发布自定义页面到宜搭平台
 **命令**：
 ```bash
-node .claude/skills/yida-publish-page/scripts/publish.js APP_XXX FORM-XXX pages/src/my-page.js
+yidacli publish pages/src/my-page.js APP_XXX FORM-XXX
 ```
 
 ---
@@ -68,7 +68,7 @@ node .claude/skills/yida-publish-page/scripts/publish.js APP_XXX FORM-XXX pages/
 - 首次使用需安装依赖：
 
 ```bash
-cd .claude/skills/yida-publish/scripts && npm install
+# yidacli 已包含所有依赖，无需单独安装
 pip install playwright && playwright install chromium
 ```
 
@@ -87,9 +87,7 @@ node scripts/babel-transform/transform.js <源文件路径>
 ### 部署到宜搭
 
 ```bash
-cd .claude/skills/yida-publish-page/scripts
-npm install  # 首次需要安装依赖
-node publish.js <appType> <formUuid> <源文件路径>
+yidacli publish <源文件路径> <appType> <formUuid>
 ```
 
 **部署流程**：
@@ -107,7 +105,7 @@ node publish.js <appType> <formUuid> <源文件路径>
 | `formUuid` | 表单 ID | `FORM-XXX` |
 | `源文件路径` | 源码文件路径 | `pages/src/xxx.js` |
 
-> `baseUrl` 无需手动传入，脚本会自动调用 `login.py` 获取登录态并从中读取 `base_url`。
+> `baseUrl` 无需手动传入，`yidacli` 会自动获取登录态并从中读取 `base_url`。
 
 ---
 
@@ -123,7 +121,7 @@ node publish.js <appType> <formUuid> <源文件路径>
 | --- | --- |
 | **React 版本** | 必须兼容 **React 16**，禁止使用 Hooks（`useState`、`useEffect` 等） |
 | **单文件** | 所有代码写在一个文件中（如 `index.js`）|
-| **三方包引入** | 禁止使用 `import/require` 语法，如需使用第三方库，必须通过 `this.utils.loadScript` 加载 CDN 脚本，参考 [yida-api.md](reference/yida-api.md) 的「工具类 API」章节。|
+| **三方包引入** | 禁止使用 `import/require` 语法，如需使用第三方库，必须通过 `this.utils.loadScript` 加载 CDN 脚本，参考 [yida-api.md](../../reference/yida-api.md) 的「工具类 API」章节。|
 | **函数导出格式** | 使用 `export function xxx() {}` 格式导出函数 |
 | **样式** | 所有 css 必须写在 renderJsx 的方法中，通过 style 的方式引入 |
 | **`this` 上下文** | 所有导出函数中的 `this` 指向宜搭页面的 React 类实例 |
@@ -466,7 +464,7 @@ this.utils.yida.searchFormDatas({
 | `saveFormSchema` | 保存表单 Schema | `POST /dingtalk/web/{appType}/_view/query/formdesign/saveFormSchema.json` |
 | `updateFormConfig` | 更新表单配置 | `POST /dingtalk/web/{appType}/query/formdesign/updateFormConfig.json` |
 
-完整参数说明请参考 [yida-api.md](reference/yida-api.md) 的「表单设计类 API」章节。
+完整参数说明请参考 [yida-api.md](../../reference/yida-api.md) 的「表单设计类 API」章节。
 
 ### 大模型 AI 接口
 
@@ -478,7 +476,7 @@ this.utils.yida.searchFormDatas({
 
 **主要参数**：`_csrf_token`（CSRF 令牌）、`prompt`（提示词）、`skill`（技能类型，如 `ToText`）、`maxTokens`（最大返回 token 数）
 
-完整参数说明和示例请参考 [model-api.md](reference/model-api.md)。
+完整参数说明和示例请参考 [model-api.md](../../reference/model-api.md)。
 
 ---
 
@@ -502,22 +500,20 @@ this.utils.yida.searchFormDatas({
 | `previewImage` | 图片预览 | 图片查看、多图轮播 |
 | `loadScript` | 动态加载脚本 | 引入第三方库（如二维码生成） |
 
-完整参数说明和示例请参考 [yida-api.md](reference/yida-api.md) 的「工具类 API」章节。
+完整参数说明和示例请参考 [yida-api.md](../../reference/yida-api.md) 的「工具类 API」章节。
 
 ## 工具链
 
 | Skill | 说明 | 用法 |
 | --- | --- | --- |
-| **yida-login** | 登录态管理（Cookie 持久化 + 扫码登录） | `python3 .claude/skills/yida-login/scripts/login.py` |
-| **yida-publish-page** | 编译源码 + 构建 Schema + 发布到宜搭 | `node .claude/skills/yida-publish-page/scripts/publish.js <appType> <formUuid> <源文件路径>` |
-| **yida-page-config** | 页面配置（URL 验证、公开访问/分享配置） | `node .claude/skills/yida-page-config/scripts/verify-short-url.js <appType> <formUuid> /o/xxx` |
+| **yida-login** | 登录态管理（Cookie 持久化 + 扫码登录） | `yidacli login` |
+| **yida-publish-page** | 编译源码 + 构建 Schema + 发布到宜搭 | `yidacli publish <源文件路径> <appType> <formUuid>` |
+| **yida-page-config** | 页面配置（URL 验证、公开访问/分享配置） | 详见 `yida-page-config` 技能文档 |
 
 ### 编译 + 发布（一键完成）
 
 ```bash
-cd .claude/skills/yida-publish-page/scripts
-npm install  # 首次需要安装依赖
-node publish.js <appType> <formUuid> <源文件路径>
+yidacli publish <源文件路径> <appType> <formUuid>
 ```
 
 **处理流程**：
@@ -529,7 +525,7 @@ node publish.js <appType> <formUuid> <源文件路径>
 ### 仅编译（不发布）
 
 ```bash
-node .claude/skills/yida-publish-page/scripts/babel-transform/transform.js <源文件路径>
+yidacli publish <源文件路径> <appType> <formUuid>
 ```
 
 输入 JSX 源文件，输出编译压缩后的 `<name>.compile.js`（与源文件同目录）。

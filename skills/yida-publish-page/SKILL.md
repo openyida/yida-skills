@@ -35,7 +35,7 @@ metadata:
 **场景**：将 JSX 源码编译并发布到宜搭
 **命令**：
 ```bash
-node .claude/skills/yida-publish-page/scripts/publish.js APP_XXX FORM-XXX pages/src/my-page.js
+node <skill_root>/yida-publish-page/scripts/publish.js APP_XXX FORM-XXX pages/src/my-page.js
 ```
 **输出**：
 ```json
@@ -45,7 +45,7 @@ node .claude/skills/yida-publish-page/scripts/publish.js APP_XXX FORM-XXX pages/
 ## 使用方式
 
 ```bash
-cd .claude/skills/yida-publish/scripts
+cd <skill_root>/yida-publish/scripts
 npm install  # 首次需要安装依赖
 node publish.js <appType> <formUuid> <源文件路径>
 ```
@@ -84,7 +84,7 @@ node publish.js APP_XXX FORM-XXXXXX pages/src/xxx.js
 - playwright（Python 版，yida-login 依赖）
 
 ```bash
-cd .claude/skills/yida-publish-page/scripts && npm install
+cd <skill_root>/yida-publish-page/scripts && npm install
 ```
 
 ## 文件结构
@@ -100,7 +100,7 @@ yida-publish/
 
 ## 接口说明
 
-`saveFormSchema` 和 `updateFormConfig` 接口的完整参数、返回值和错误处理机制，请参考 `reference/yida-api.md` 文档中的「表单设计类 API」章节。
+`saveFormSchema` 和 `updateFormConfig` 接口的完整参数、返回值和错误处理机制，请参考 `../../reference/yida-api.md` 文档中的「表单设计类 API」章节。
 
 > **注意**：自定义页面发布时，`updateFormConfig` 的 `value` 参数固定为 `8`（区别于表单页面的 `0`）。
 

@@ -17,15 +17,5 @@ yarn.lock
 pnpm-lock.yaml
 package-lock.json
 
-# cookies
-.cache/cookies.json
-
-# claude
-.claude/*
-
-# dev/*
-prd/*
-pages/*
-
 # test coverage
 coverage/

@@ -6,7 +6,7 @@
 [![GitHub Stars](https://img.shields.io/github/stars/openyida/yida-skills)](https://github.com/openyida/yida-skills/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/openyida/yida-skills)](https://github.com/openyida/yida-skills/fork)
 
-一套专为 [钉钉宜搭](https://www.aliwork.com) 平台设计的 AI Skills，覆盖从登录、建应用、建表单、开发自定义页面到发布的完整研发链路。配合 **OpenCode** 或 **ClaudeCode** 使用，让 AI 真正能帮你端到端地完成宜搭应用开发。
+一套专为 [钉钉宜搭](https://www.aliwork.com) 平台设计的 AI Skills，覆盖从登录、建应用、建表单、开发自定义页面到发布的完整研发链路。配合 **悟空、OpenCode** 或 **ClaudeCode** 使用，让 AI 真正能帮你端到端地完成宜搭应用开发。
 
 ## 功能特性
 
@@ -38,81 +38,36 @@
 
 ## 快速开始
 
-### 使用 openyida 默认工程模板（推荐）
+### 第一步：安装技能
 
-```bash
-# 1.克隆工程模板仓库
+目前还未发布到市场，先手动下载 yida-skills.zip，然后：
 
-  git clone https://github.com/openyida/openyida.git
-
-# 2. 使用代码编辑器打开项目，打开自己的 AI 编程工具，输入：执行安装脚本，等待 Skills 安装完成
-# 3. 一句话生成应用：帮我创建一个访客系统应用
-# 4. 根据需求文档生成应用：帮我搭建个人薪资计算器应用
-```
-
-### 使用自己的项目工程，请参考文件结构约定
-
-```
-项目根目录/
-├── README.md                # 用来判断根目录路径，必须存在
-├── config.json              # 全局配置（loginUrl、defaultBaseUrl）
-├── .cache/
-│   └── cookies.json         # 登录态缓存和其他临时文件（运行时自动生成）
-├── pages/src/
-│   └── <项目名>.js          # 自定义页面源码
-├── pages/dist/
-│   └── <项目名>.js          # 自定义页面编译后的代码
-├── prd/
-│   └── <项目名>.md          # 需求文档（含所有配置信息）
-└── .claude/
-    └── skills/              # 各子技能目录
-```
----
-
-## 目录结构
-
-```
-yida-skills/
-├── skills/                        # 技能源文件
-│   ├── yida-login/                # 登录管理
-│   │   ├── SKILL.md               # 技能说明（AI 读取）
-│   │   └── scripts/               # 执行脚本
-│   │       └── login.py
-│   ├── yida-logout/
-│   ├── yida-create-app/
-│   │   └── scripts/
-│   │       └── create-app.js
-│   ├── yida-create-page/
-│   ├── yida-create-form-page/
-│   │   └── reference/             # 参考文档
-│   ├── yida-custom-page/
-│   │   └── reference/            # 参考文档
-│   │       ├── yida-api.md
-│   │       └── model-api.md
-│   ├── yida-publish-page/
-│   │   └── scripts/
-│   │       ├── publish.js
-│   │       ├── babel-transform/
-│   │       └── package.json
-│   ├── yida-app/
-│   └── yida-get-schema/
-├── examples/                      # 示例代码
-│   └── contact-form/
-├── .github/
-│   └── workflows/                 # CI 配置
-├── README.md
-└── LICENSE
-```
+悟空 (Wukong): 直接上传技能，选择 yida-skills.zip
+OpenCode: 手动解压到 ~/.opencode/skills/
+Claude Code: 手动解压到 ~/.claudecode/skills/
+Cursor: 手动解压到 ~/.cursor/skills/
+Qoder: 手动解压到 ~/.qoder/skills/
+iFlow: 手动解压到 ~/.iflow/skills/
+Aone Copilot: 手动解压到 ~/.aone-copilot/skills/
 
 ---
+
+### 第二步：使用
+
+直接对话：
+
+- `帮我创建一个访客系统应用`
+- `帮我搭建一个生日祝福小游戏应用`
+- `帮我搭建个人薪资计算器应用`
+
+---
+
 
 ## 依赖环境
 
 | 依赖 | 版本要求 | 用途 |
 |------|----------|------|
 | Node.js | ≥ 16 | yida-publish、yida-create-* 系列脚本 |
-| Python | ≥ 3.8 | yida-login、yida-logout |
-| Playwright | latest | 登录态管理 |
 
 ---
 
@@ -169,23 +124,19 @@ Thanks to all contributors:
 
 ---
 
-## 示例代码
-
-详见 `examples/` 目录：
-
-| 示例 | 说明 |
-|------|------|
-| `examples/contact-form/` | 留资表单完整示例 |
-
----
-
 ## 常见问题
 
-**Q: 运行脚本报错 "node_modules not found"？**
-> 需要先安装依赖：`npm install --prefix skills/yida-publish-page/scripts`
+**Q: yidacli 命令不存在？**
+> 需要先安装：`npm install -g @openyida/yidacli`
+
+**Q: 登录态失效怎么办？**
+> 运行 `yidacli login` 重新扫码登录，或告诉 AI "yidacli 登录态失效了，帮我重新登录"
+
+**Q: 如何更新 yidacli？**
+> yidacli 内置自动版本检测，看到更新提示后运行：`npm install -g @openyida/yidacli@latest`
 
 **Q: 编译报错如何排查？**
-> 错误信息会显示具体行号和列号
+> 错误信息会显示具体行号和列号，确保代码符合 `yida-custom-page` 规范（禁止使用 React Hooks）
 
 ## License
 

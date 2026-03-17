@@ -1,6 +1,6 @@
 ---
 name: yida-login
-description: 宜搭平台登录态管理技能，通过 Playwright 管理登录态（Cookie 持久化 + 扫码登录），获取 CSRF Token。
+description: 宜搭平台登录态管理技能，支持标准环境（Playwright 扫码登录）和悟空环境（CDP 从内置浏览器提取 Cookie），Cookie 持久化 + 自动获取 CSRF Token。
 license: MIT
 compatibility:
   - opencode
@@ -8,12 +8,13 @@ compatibility:
 metadata:
   audience: developers
   workflow: yida-auth
-  version: 1.0.0
+  version: 1.1.0
   tags:
     - yida
     - auth
     - login
     - cookie
+    - wukong
 ---
 
 # 宜搭登录态管理技能
@@ -32,31 +33,58 @@ metadata:
 
 ## 使用示例
 
-### 示例 1：触发登录
-**场景**：手动触发扫码登录
+### 示例 1：标准环境触发登录
+**场景**：手动触发扫码登录（标准环境）
 **命令**：
 ```bash
-python3 .claude/skills/yida-login/scripts/login.py
+yidacli login
 ```
 **输出**：
 ```json
 {"csrf_token":"b2a5d192-xxx","corp_id":"dingxxx","user_id":"1955225xxx","base_url":"https://abcd.aliwork.com"}
 ```
 
-### 示例 2：刷新 CSRF Token
-**场景**：CSRF Token 失效但 Cookie 有效
-**命令**：
+### 示例 2：悟空环境登录
+**场景**：在悟空（Real）环境中，从内置浏览器提取登录态
+
+> ⚠️ **AI 必读**：在悟空环境中触发登录时，必须按以下步骤操作，**不能**直接运行脚本。
+
+**步骤 1**：读取登录地址
 ```bash
-python3 .claude/skills/yida-login/scripts/login.py --refresh-csrf
+cat config.json  # 获取 loginUrl 字段
+```
+
+**步骤 2**：使用悟空内置浏览器打开登录页面，等待用户完成扫码登录
+- 悟空环境内置浏览器控制能力，可直接打开 URL（使用悟空的 `open_url` 或浏览器工具）
+- 登录地址即 `config.json` 中的 `loginUrl`（如 `https://www.aliwork.com/workPlatform`）
+- 等待用户在内置浏览器中完成钉钉扫码登录后，再进行步骤 3
+
+**步骤 3**：登录完成后，运行命令从内置浏览器提取 Cookie
+```bash
+yidacli login --wukong
+```
+**输出**（与标准登录格式完全一致）：
+```json
+{"csrf_token":"b2a5d192-xxx","corp_id":"dingxxx","user_id":"1955225xxx","base_url":"https://abcd.aliwork.com","cookies":[...]}
 ```
 
 ## 使用方式
 
+### 标准环境
+
 ```bash
-python3 .claude/skills/yida-login/scripts/login.py
+yidacli login
 ```
 
 无需任何参数，登录地址从项目根目录的 `config.json` 中读取（`loginUrl` 字段），登录后可能跳转到 `abcd.aliwork.com` 等域名。
+
+### 悟空环境
+
+```bash
+yidacli login --wukong
+```
+
+**工作原理**：通过 CDP 协议连接悟空内置浏览器（端口 4249），调用 `Network.getAllCookies` 提取完整 Cookie（包括 `document.cookie` 无法获取的 HttpOnly Cookie），从中提取 `tianshu_csrf_token` 等关键字段。
 
 **输出**：登录成功后，将 `csrf_token`、`base_url`（跳转后的实际域名）和 Cookie 信息以 JSON 格式输出到 stdout，同时 Cookie 持久化到项目根目录的 `.cache/cookies.json`。
 
@@ -73,16 +101,14 @@ python3 .claude/skills/yida-login/scripts/login.py
 
 ## 前置依赖
 
-- Python 3.12+
-- playwright（`pip install playwright && playwright install chromium`）
+- Node.js 16+
+- `yidacli` NPM 包已安装（`npm install -g @openyida/yidacli`）
 
 ## 文件结构
 
 ```
 yida-login/
-├── SKILL.md           # 本文档
-└── scripts/
-    └── login.py       # 登录脚本
+└── SKILL.md           # 本文档
 
 项目根目录/
 ├── config.json        # 全局配置（loginUrl、defaultBaseUrl）
@@ -125,7 +151,7 @@ yida-login/
 
 ## 全局配置
 
-所有脚本（`login.py` 及各 JS 脚本）从项目根目录的 `config.json` 读取配置，不再硬编码 URL：
+`yidacli` 从项目根目录的 `config.json` 读取配置，不再硬编码 URL：
 
 ```json
 {
@@ -143,19 +169,21 @@ yida-login/
 
 各 skill 脚本通过解析接口响应体的 `errorCode` 字段来判断登录态异常，并自动调用本技能处理：
 
-| errorCode | 含义 | 处理方式 |
-| --- | --- | --- |
-| `"TIANSHU_000030"` | csrf 校验失败（csrf_token 过期） | 调用 `login.py --refresh-csrf` 无头刷新 csrf_token，无需重新扫码 |
-| `"307"` | 登录状态已过期（Cookie 失效） | 调用 `login.py` 触发完整重新登录（可能需要扫码） |
+| errorCode | 含义 | 标准环境处理方式 | 悟空环境处理方式 |
+| --- | --- | --- | --- |
+| "TIANSHU_000030" | csrf 校验失败（csrf_token 过期） | `yidacli login` 自动无头刷新 csrf_token，无需重新扫码 | `yidacli login --wukong` 重新从内置浏览器提取完整 Cookie |
+| "307" | 登录状态已过期（Cookie 失效） | `yidacli login` 触发完整重新登录（可能需要扫码） | `yidacli login --wukong` 重新从内置浏览器提取完整 Cookie |
 
 > **注意**：错误判断基于响应体 JSON 的 `errorCode` 字段，而非 HTTP 状态码。
+
+> **悟空环境说明**：悟空环境下不支持 `--refresh-csrf` 模式，csrf_token 过期和 Cookie 失效均通过重新调用 `yidacli login --wukong` 处理。由于 CDP 提取 Cookie 速度极快（无需扫码），这不会带来明显的延迟。
 
 ## 退出登录
 
 清空本地 Cookie 缓存文件内容即可完成退出，下次调用任意技能时将自动触发重新扫码登录：
 
 ```bash
-echo -n "" > .cache/cookies.json
+yidacli logout
 ```
 
 **适用场景**：
@@ -167,6 +195,6 @@ echo -n "" > .cache/cookies.json
 
 ## 与其他技能配合
 
-- **退出登录**：需要切换账号或 Cookie 失效时，执行上方「退出登录」命令后重新运行任意技能即可触发扫码登录
+- **退出登录**：需要切换账号或 Cookie 失效时，执行 `yidacli logout` 后重新运行任意技能即可触发扫码登录
 - **`yida-publish`**：发布时自动调用本技能获取登录态
-- **`yida-create-app`**、**`yida-create-page`**、**`yida-create-form-page`**：通过管道将本技能输出传入
+- **`yida-create-app`**、**`yida-create-page`**、**`yida-create-form-page`**：自动调用本技能获取登录态

@@ -43,6 +43,25 @@ metadata:
 - 在配置公开访问/分享之前需要检查 URL 是否被占用
 - 需要修改或关闭已有页面的分享配置
 
+## ⚠️ 重要限制：自定义页面使用表单数据时不支持公开发布
+
+**如果自定义页面中有读取或写入宜搭表单数据的操作（如查询表单记录、提交表单等），则该页面不支持配置公开访问（`/o/xxx`）。**
+
+原因：公开访问页面对任何人开放，无需登录，但宜搭表单数据接口需要登录态（Cookie）才能访问，匿名用户无法读取表单数据，页面会出现数据加载失败的问题。
+
+**判断标准**：
+
+| 页面类型 | 是否支持公开访问 |
+|---------|---------------|
+| 纯展示页面（静态内容、外部 API） | ✅ 支持 |
+| 使用宜搭表单数据（查询/提交/更新） | ❌ 不支持 |
+| 使用宜搭成员/部门数据 | ❌ 不支持 |
+
+**遇到此情况时，AI 应该**：
+1. 不生成公开访问链接（`/o/xxx`）
+2. 告知用户该页面因使用了表单数据，不支持公开访问
+3. 如有需要，可配置**组织内分享**（`/s/xxx`），仅限组织内登录成员访问
+
 ## URL 格式要求
 
 - 公开访问：`/o/xxx`，如 `/o/myapp`
@@ -54,27 +73,27 @@ metadata:
 
 ### 示例 1：验证公开访问 URL
 ```bash
-node .claude/skills/yida-page-config/scripts/verify-short-url.js APP_XXX FORM-XXX /o/myapp
+yidacli verify-short-url APP_XXX FORM-XXX /o/myapp
 ```
 
 ### 示例 2：开启公开访问
 ```bash
-node .claude/skills/yida-page-config/scripts/save-share-config.js APP_XXX FORM-XXX /o/myapp y n
+yidacli save-share-config APP_XXX FORM-XXX /o/myapp y n
 ```
 
 ### 示例 3：关闭公开访问
 ```bash
-node .claude/skills/yida-page-config/scripts/save-share-config.js APP_XXX FORM-XXX "" n
+yidacli save-share-config APP_XXX FORM-XXX "" n
 ```
 
 ### 示例 4：查询页面配置
 ```bash
-node .claude/skills/yida-page-config/scripts/get-page-config.js APP_XXX FORM-XXX
+yidacli get-page-config APP_XXX FORM-XXX
 ```
 
 ### 示例 5：隐藏顶部导航
 ```bash
-node .claude/skills/yida-page-config/scripts/update-form-config.js APP_XXX FORM-XXX false "页面标题"
+yidacli update-form-config APP_XXX FORM-XXX false "页面标题"
 ```
 
 ## 工具说明
@@ -84,7 +103,7 @@ node .claude/skills/yida-page-config/scripts/update-form-config.js APP_XXX FORM-
 验证短链接 URL 是否已被占用。
 
 ```bash
-node .claude/skills/yida-page-config/scripts/verify-short-url.js <appType> <formUuid> <url>
+yidacli verify-short-url <appType> <formUuid> <url>
 ```
 
 **参数**：
@@ -111,7 +130,7 @@ node .claude/skills/yida-page-config/scripts/verify-short-url.js <appType> <form
 保存页面的公开访问或组织内分享配置。
 
 ```bash
-node .claude/skills/yida-page-config/scripts/save-share-config.js <appType> <formUuid> <url> <isOpen> [openAuth]
+yidacli save-share-config <appType> <formUuid> <url> <isOpen> [openAuth]
 ```
 
 **参数**：
@@ -140,7 +159,7 @@ node .claude/skills/yida-page-config/scripts/save-share-config.js <appType> <for
 查询页面的公开访问/分享配置。
 
 ```bash
-node .claude/skills/yida-page-config/scripts/get-page-config.js <appType> <formUuid>
+yidacli get-page-config <appType> <formUuid>
 ```
 
 **输出**：
@@ -158,7 +177,7 @@ node .claude/skills/yida-page-config/scripts/get-page-config.js <appType> <formU
 更新表单的基本配置，如显示/隐藏顶部导航。
 
 ```bash
-node .claude/skills/yida-page-config/scripts/update-form-config.js <appType> <formUuid> <isRenderNav> <title>
+yidacli update-form-config <appType> <formUuid> <isRenderNav> <title>
 ```
 
 **参数**：
@@ -183,6 +202,7 @@ node .claude/skills/yida-page-config/scripts/update-form-config.js <appType> <fo
 ## 前置依赖
 
 - Node.js
+- `yida-cli` 工具已安装（`npm install -g yida-cli`）
 - 项目根目录存在 `.cache/cookies.json`（首次运行会自动触发扫码登录）
 
 ## 调用流程
@@ -196,13 +216,10 @@ node .claude/skills/yida-page-config/scripts/update-form-config.js <appType> <fo
 
 ```
 yida-page-config/
-├── SKILL.md                      # 本文档
-└── scripts/
-    ├── verify-short-url.js        # URL 验证脚本
-    ├── save-share-config.js       # 公开访问/分享配置保存脚本
-    ├── get-page-config.js         # 查询页面配置脚本
-    └── update-form-config.js      # 表单配置更新脚本（如隐藏导航）
+└── SKILL.md                      # 本文档
 ```
+
+> 脚本已集成到 `openyida-cli` 工具中，通过 `yidacli` 命令调用。
 
 ## 接口说明
 

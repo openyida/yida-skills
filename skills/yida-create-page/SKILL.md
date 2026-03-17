@@ -34,7 +34,7 @@ metadata:
 **场景**：在已有应用中创建一个自定义页面
 **命令**：
 ```bash
-node .claude/skills/yida-create-page/scripts/create-page.js "APP_XXX" "游戏主页"
+yidacli create-page "APP_XXX" "游戏主页"
 ```
 **输出**：
 ```json
@@ -44,7 +44,7 @@ node .claude/skills/yida-create-page/scripts/create-page.js "APP_XXX" "游戏主
 ## 使用方式
 
 ```bash
-node .claude/skills/yida-create-page/scripts/create-page.js <appType> <pageName>
+yidacli create-page <appType> <pageName>
 ```
 
 **参数说明**：
@@ -57,7 +57,7 @@ node .claude/skills/yida-create-page/scripts/create-page.js <appType> <pageName>
 **示例**：
 
 ```bash
-node .claude/skills/yida-create-page/scripts/create-page.js "APP_xxx" "游戏主页"
+yidacli create-page "APP_xxx" "游戏主页"
 ```
 
 **输出**：日志输出到 stderr，JSON 结果输出到 stdout：
@@ -73,7 +73,7 @@ node .claude/skills/yida-create-page/scripts/create-page.js "APP_xxx" "游戏主
 
 ## 调用流程
 
-1. 读取项目根目录的 `.cache/cookies.json` 获取登录态；若不存在则自动调用 `login.py` 触发扫码登录
+1. 读取项目根目录的 `.cache/cookies.json` 获取登录态；若不存在则自动触发扫码登录
 2. 调用 `saveFormSchemaInfo` 接口创建 display 类型页面；根据响应体 `errorCode` 自动处理异常（详见 `yida-login` 技能文档「错误处理机制」章节）
 3. 从返回值中获取页面 ID（formUuid）
 4. **将 `pageId`（formUuid）记录到 `prd/<项目名>.md` 的应用配置章节**
@@ -82,14 +82,12 @@ node .claude/skills/yida-create-page/scripts/create-page.js "APP_xxx" "游戏主
 
 ```
 yida-create-page/
-├── SKILL.md                # 本文档
-└── scripts/
-    └── create-page.js      # 页面创建脚本
+└── SKILL.md                # 本文档
 ```
 
 ## 接口说明
 
-`saveFormSchemaInfo` 接口的完整参数、返回值和错误处理机制，请参考 `reference/yida-api.md` 文档中的「表单设计类 API」章节。
+`saveFormSchemaInfo` 接口的完整参数、返回值和错误处理机制，请参考 `../../reference/yida-api.md` 文档中的「表单设计类 API」章节。
 
 > **注意**：创建自定义页面时，`formType` 参数固定为 `display`（区别于表单页面的 `receipt`）。
 

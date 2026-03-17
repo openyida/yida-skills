@@ -36,15 +36,13 @@ metadata:
 **场景**：清空登录态缓存
 **命令**：
 ```bash
-echo -n "" > .cache/cookies.json
+yidacli logout
 ```
 
 ## 使用方式
 
-清空项目根目录下的 `.cache/cookies.json` 缓存文件内容即可完成退出：
-
 ```bash
-echo -n "" > .cache/cookies.json
+yidacli logout
 ```
 
 ## 工作流程
@@ -52,7 +50,7 @@ echo -n "" > .cache/cookies.json
 1. 清空项目根目录下的 `.cache/cookies.json` 文件内容（写入空字符串）
 2. 下次调用 `yida-login` 时，因缓存内容为空，将自动打开浏览器要求重新扫码登录
 
-> **注意**：Cookie 缓存文件位于**项目根目录**（含 `README.md` 或 `.git` 的目录）的 `.cache/` 目录下，而非 `yida-login/scripts/` 目录下。
+> **注意**：Cookie 缓存文件位于**项目根目录**（含 `README.md` 或 `.git` 的目录）的 `.cache/` 目录下。
 
 ## 与其他技能配合
 

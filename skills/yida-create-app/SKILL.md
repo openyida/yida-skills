@@ -34,7 +34,7 @@ metadata:
 **场景**：创建一个简单的宜搭应用
 **命令**：
 ```bash
-node .claude/skills/yida-create-app/scripts/create-app.js "考勤管理"
+yidacli create-app "考勤管理"
 ```
 **输出**：
 ```json
@@ -45,13 +45,13 @@ node .claude/skills/yida-create-app/scripts/create-app.js "考勤管理"
 **场景**：创建带描述和图标的应用
 **命令**：
 ```bash
-node .claude/skills/yida-create-app/scripts/create-app.js "考勤管理" "员工考勤打卡系统" "xian-daka" "#00B853"
+yidacli create-app "考勤管理" "员工考勤打卡系统" "xian-daka" "#00B853"
 ```
 
 ## 使用方式
 
 ```bash
-node .claude/skills/yida-create-app/scripts/create-app.js <appName> [description] [icon] [iconColor]
+yidacli create-app <appName> [description] [icon] [iconColor]
 ```
 
 **参数说明**：
@@ -67,10 +67,10 @@ node .claude/skills/yida-create-app/scripts/create-app.js <appName> [description
 
 ```bash
 # 最简用法
-node .claude/skills/yida-create-app/scripts/create-app.js "考勤管理"
+yidacli create-app "考勤管理"
 
 # 完整参数
-node .claude/skills/yida-create-app/scripts/create-app.js "考勤管理" "员工考勤打卡系统" "xian-daka" "#00B853"
+yidacli create-app "考勤管理" "员工考勤打卡系统" "xian-daka" "#00B853"
 ```
 
 **输出**：日志输出到 stderr，JSON 结果输出到 stdout：
@@ -86,7 +86,7 @@ node .claude/skills/yida-create-app/scripts/create-app.js "考勤管理" "员工
 
 ## 调用流程
 
-1. 读取项目根目录的 `.cache/cookies.json` 获取登录态；若不存在则自动调用 `login.py` 触发扫码登录
+1. 读取项目根目录的 `.cache/cookies.json` 获取登录态；若不存在则自动触发扫码登录
 2. 构建 `registerApp` 请求参数
 3. 发送 POST 请求到 `/query/app/registerApp.json`；根据响应体 `errorCode` 自动处理异常（详见 `yida-login` 技能文档「错误处理机制」章节）
 4. 从返回值中获取应用 ID（appType）
@@ -96,9 +96,7 @@ node .claude/skills/yida-create-app/scripts/create-app.js "考勤管理" "员工
 
 ```
 yida-create-app/
-├── SKILL.md                # 本文档
-└── scripts/
-    └── create-app.js       # 应用创建脚本
+└── SKILL.md                # 本文档
 ```
 
 ## 接口说明
