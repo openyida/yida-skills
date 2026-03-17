@@ -1,3 +1,22 @@
+---
+name: yida-export
+description: 宜搭应用导出技能，将应用下所有表单的完整 Schema 打包为可移植的迁移包（yida-export.json），用于跨环境应用迁移。
+license: MIT
+compatibility:
+  - opencode
+  - claude-code
+metadata:
+  audience: developers
+  workflow: yida-development
+  version: 1.0.0
+  tags:
+    - yida
+    - low-code
+    - migration
+    - export
+    - api
+---
+
 # yida-export
 
 导出宜搭应用的所有表单 Schema，生成可移植的迁移包，用于跨环境应用迁移。

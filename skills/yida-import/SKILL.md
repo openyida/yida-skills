@@ -1,3 +1,22 @@
+---
+name: yida-import
+description: 宜搭应用导入技能，将 yida-export 导出的迁移包导入到目标宜搭环境，自动重建应用和所有表单页面，并生成含新旧 formUuid 映射的迁移报告。
+license: MIT
+compatibility:
+  - opencode
+  - claude-code
+metadata:
+  audience: developers
+  workflow: yida-development
+  version: 1.0.0
+  tags:
+    - yida
+    - low-code
+    - migration
+    - import
+    - api
+---
+
 # yida-import
 
 将 `yida-export` 导出的应用迁移包导入到目标宜搭环境，自动重建应用和所有表单页面。
