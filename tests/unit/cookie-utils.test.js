@@ -29,7 +29,7 @@ function extractInfoFromCookies(cookies) {
 }
 
 function isLoginExpired(responseJson) {
-  return responseJson && responseJson.success === false && responseJson.errorCode === "307";
+  return responseJson && responseJson.success === false && (responseJson.errorCode === "307" || responseJson.errorCode === "302");
 }
 
 function isCsrfTokenExpired(responseJson) {

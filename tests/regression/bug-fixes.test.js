@@ -33,7 +33,7 @@ function resolveBaseUrl(cookieData) {
 }
 
 function isLoginExpired(responseJson) {
-  return responseJson && responseJson.success === false && responseJson.errorCode === "307";
+  return responseJson && responseJson.success === false && (responseJson.errorCode === "307" || responseJson.errorCode === "302");
 }
 
 function isCsrfTokenExpired(responseJson) {
@@ -251,5 +251,112 @@ describe("Bug #5: icon 字段格式必须为 icon%%iconColor", () => {
     const iconValue = buildIconValue("xian-yingyong", "#0089FF");
     expect(iconValue).not.toMatch(/^[^%]+%[^%]/); // 不是单个 %
     expect(iconValue).toContain("%%");
+  });
+});
+
+// ── Bug #6: 自定义页面获取数据时 pageSize 超过最大值 100 导致报错 ────
+//
+// 问题：AI 生成自定义页面代码时，调用 searchFormDatas、searchFormDataIds、
+//       getProcessInstances、getProcessInstanceIds 等分页接口时，
+//       有时会将 pageSize 设置为超过 100 的值（如 200、1000），
+//       导致宜搭接口报错。
+// 修复：在 SKILL.md 和 yida-api.md 中明确约束 pageSize 最大值为 100。
+// 关联：Issue #95，PR #96
+
+describe("Bug #6: pageSize 不得超过最大值 100", () => {
+  // 模拟 pageSize 校验函数（与 SKILL.md 约束一致）
+  function validatePageSize(pageSize) {
+    const MAX_PAGE_SIZE = 100;
+    if (typeof pageSize !== "number" || pageSize < 1) {
+      return { valid: false, reason: "pageSize 必须为正整数" };
+    }
+    if (pageSize > MAX_PAGE_SIZE) {
+      return { valid: false, reason: `pageSize 不得超过 ${MAX_PAGE_SIZE}，当前值：${pageSize}` };
+    }
+    return { valid: true };
+  }
+
+  // 模拟构建分页请求参数（确保 pageSize 不超限）
+  function buildPaginationParams({ formUuid, currentPage = 1, pageSize = 10 }) {
+    const MAX_PAGE_SIZE = 100;
+    return {
+      formUuid,
+      currentPage,
+      pageSize: Math.min(pageSize, MAX_PAGE_SIZE),
+    };
+  }
+
+  test("pageSize 为 10 时合法", () => {
+    expect(validatePageSize(10).valid).toBe(true);
+  });
+
+  test("pageSize 为 100 时合法（边界值）", () => {
+    expect(validatePageSize(100).valid).toBe(true);
+  });
+
+  test("pageSize 为 101 时非法（超过最大值）", () => {
+    const result = validatePageSize(101);
+    expect(result.valid).toBe(false);
+    expect(result.reason).toContain("100");
+  });
+
+  test("pageSize 为 200 时非法", () => {
+    expect(validatePageSize(200).valid).toBe(false);
+  });
+
+  test("pageSize 为 1000 时非法", () => {
+    expect(validatePageSize(1000).valid).toBe(false);
+  });
+
+  test("pageSize 为 0 时非法", () => {
+    expect(validatePageSize(0).valid).toBe(false);
+  });
+
+  test("pageSize 为负数时非法", () => {
+    expect(validatePageSize(-1).valid).toBe(false);
+  });
+
+  test("构建请求参数时 pageSize 超过 100 会被截断为 100", () => {
+    const params = buildPaginationParams({ formUuid: "FORM-XXX", pageSize: 500 });
+    expect(params.pageSize).toBe(100);
+    expect(params.pageSize).not.toBeGreaterThan(100);
+  });
+
+  test("构建请求参数时 pageSize 为 50 不受影响", () => {
+    const params = buildPaginationParams({ formUuid: "FORM-XXX", pageSize: 50 });
+    expect(params.pageSize).toBe(50);
+  });
+
+  test("构建请求参数时不传 pageSize 使用默认值 10", () => {
+    const params = buildPaginationParams({ formUuid: "FORM-XXX" });
+    expect(params.pageSize).toBe(10);
+    expect(params.pageSize).toBeLessThanOrEqual(100);
+  });
+
+  test("searchFormDatas 典型调用参数合法性验证", () => {
+    const searchFormDatasParams = {
+      formUuid: "FORM-ABC123",
+      currentPage: 1,
+      pageSize: 10,
+    };
+    expect(validatePageSize(searchFormDatasParams.pageSize).valid).toBe(true);
+  });
+
+  test("searchFormDataIds 典型调用参数合法性验证", () => {
+    const searchFormDataIdsParams = {
+      formUuid: "FORM-ABC123",
+      currentPage: 1,
+      pageSize: 20,
+    };
+    expect(validatePageSize(searchFormDataIdsParams.pageSize).valid).toBe(true);
+  });
+
+  test("getProcessInstances 典型调用参数合法性验证", () => {
+    const getProcessInstancesParams = {
+      formUuid: "FORM-ABC123",
+      currentPage: 1,
+      pageSize: 50,
+    };
+    expect(validatePageSize(getProcessInstancesParams.pageSize).valid).toBe(true);
   });
 });

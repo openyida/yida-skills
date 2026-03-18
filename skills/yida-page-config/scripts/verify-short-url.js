@@ -1,30 +1,36 @@
 #!/usr/bin/env node
 /**
- * create-app.js - 宜搭应用创建工具
+ * verify-short-url.js - 宜搭公开访问 URL 验证工具
  *
  * 用法：
- *   node create-app.js <appName> [description] [icon] [iconColor]
+ *   node verify-short-url.js <appType> <formUuid> <openUrl>
  *
  * 参数：
- *   appName     - 应用名称（必填）
- *   description - 应用描述（可选，默认同 appName）
- *   icon        - 图标标识（可选，默认 xian-yingyong）
- *   iconColor   - 图标颜色（可选，默认 #0089FF）
+ *   appType  - 应用 ID（必填），如 APP_XXX
+ *   formUuid - 表单 UUID（必填），如 FORM-XXX
+ *   openUrl  - 公开访问路径（必填），如 /o/xxx
+ *
+ * openUrl 格式要求：
+ *   - 必须以 /o/ 开头
+ *   - 只支持英文、数字、- 和 _
  *
  * 前置条件：
  *   项目根目录下需存在 .cache/cookies.json（由 yida-login 生成）。
  *   若接口返回 302（登录失效），脚本会自动调用 login.py 重新登录后重试。
  *
  * 示例：
- *   node .claude/skills/yida-create-app/scripts/create-app.js "考勤管理"
- *   node .claude/skills/yida-create-app/scripts/create-app.js "考勤管理" "员工考勤打卡系统" "xian-daka" "#00B853"
+ *   node .claude/skills/yida-verify-short-url/scripts/verify-short-url.js "APP_DQQJJMROOIPJ6BU7K055" "FORM-24122912EFBC4CFB826D63E7788F30C8FP6V" "/o/aaa"
+ *
+ * 输出：
+ *   - 日志输出到 stderr
+ *   - 验证结果 JSON 输出到 stdout
  *
  * 流程：
- * 1. 从 .cache/cookies.json 读取登录态（cookies + base_url）
- * 2. 构建 registerApp 请求参数
- * 3. 发送 POST 请求到 /query/app/registerApp.json
+ * 1. 验证 openUrl 格式
+ * 2. 从 .cache/cookies.json 读取登录态（cookies + base_url）
+ * 3. 调用 verifyShortUrl 接口验证 URL 是否可用
  * 4. 若接口返回 302，自动调用 login.py 重新登录后重试
- * 5. 输出创建结果（appType）到 stdout
+ * 5. 输出验证结果到 stdout
  */
 
 const https = require("https");
@@ -60,124 +66,61 @@ const CONFIG = fs.existsSync(CONFIG_PATH) ? JSON.parse(fs.readFileSync(CONFIG_PA
 const DEFAULT_BASE_URL = CONFIG.defaultBaseUrl || "https://www.aliwork.com";
 const PROJECT_ROOT = findProjectRoot();
 const COOKIE_FILE = path.join(PROJECT_ROOT, ".cache", "cookies.json");
-const LOGIN_SCRIPT = path.join(PROJECT_ROOT, ".claude", "skills", "yida-login", "scripts", "login.py");
 
-// ── prd 文档工具 ───────────────────────────────────────
-
-/**
- * 查找项目根目录下的 prd/<项目名>.md 文件
- * 通过向上查找包含 prd 文件夹的目录来确定项目根目录
- */
-function findRdFile() {
-  // 尝试从当前工作目录开始查找
-  let currentDir = process.cwd();
-  
-  // 向上查找最多 5 层
-  for (let i = 0; i < 5; i++) {
-    const rdDir = path.join(currentDir, "prd");
-    if (fs.existsSync(rdDir)) {
-      const files = fs.readdirSync(rdDir);
-      // 找到第一个 .md 文件（假设是需求文档）
-      const mdFile = files.find(f => f.endsWith(".md"));
-      if (mdFile) {
-        return path.join(rdDir, mdFile);
-      }
+// 支持 .claude/skills/ 和 skills/ 两种目录结构
+function findLoginScript() {
+  const candidates = [
+    path.join(PROJECT_ROOT, ".claude", "skills", "yida-login", "scripts", "login.py"),
+    path.join(PROJECT_ROOT, "skills", "yida-login", "scripts", "login.py"),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
     }
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) break;
-    currentDir = parentDir;
   }
-  return null;
+  return candidates[0];
 }
-
-/**
- * 更新 prd 文档中的应用配置，添加/更新 corpId
- */
-function updateRdCorpId(rdFilePath, corpId, appType, baseUrl) {
-  if (!rdFilePath || !fs.existsSync(rdFilePath)) {
-    console.error(`\n  ⚠️  未找到 prd 文档，跳过 corpId 写入`);
-    return false;
-  }
-
-  try {
-    let content = fs.readFileSync(rdFilePath, "utf-8");
-    
-    // 检查是否已有应用配置表格
-    const hasAppConfig = content.includes("## 应用配置") || content.includes("| appType |");
-    
-    if (hasAppConfig) {
-      // 更新现有配置：替换或添加 corpId 行
-      // 先检查是否有 corpId 行
-      const corpIdRegex = /\| corpId \| [^\|]*\|/;
-      if (corpIdRegex.test(content)) {
-        // 更新现有 corpId
-        content = content.replace(corpIdRegex, `| corpId | ${corpId} |`);
-      } else {
-        // 在 appType 行后插入 corpId 行
-        content = content.replace(
-          /(\| appType \| [^\|]*\|)(\r?\n)/,
-          `$1$2| corpId | ${corpId} |$2`
-        );
-      }
-      
-      // 同时更新 appType 和 baseUrl
-      content = content.replace(/\| appType \| [^\|]*\|/, `| appType | ${appType} |`);
-      content = content.replace(/\| baseUrl \| [^\|]*\|/, `| baseUrl | ${baseUrl} |`);
-    } else {
-      // 没有应用配置表格，在文件开头添加
-      const appConfigSection = `## 应用配置
-
-| 配置项 | 值 |
-| --- | --- |
-| appType | ${appType} |
-| corpId | ${corpId} |
-| baseUrl | ${baseUrl} |
-
-`;
-      // 在第一个标题前插入，或在文件开头插入
-      if (content.startsWith("#")) {
-        content = content.replace(/^(# .*\r?\n)/, `$1\n${appConfigSection}`);
-      } else {
-        content = appConfigSection + content;
-      }
-    }
-    
-    fs.writeFileSync(rdFilePath, content, "utf-8");
-    console.error(`  ✅ 已更新 prd 文档: ${path.basename(rdFilePath)}`);
-    console.error(`     - corpId: ${corpId}`);
-    console.error(`     - appType: ${appType}`);
-    console.error(`     - baseUrl: ${baseUrl}`);
-    return true;
-  } catch (err) {
-    console.error(`  ⚠️  更新 prd 文档失败: ${err.message}`);
-    return false;
-  }
-}
+const LOGIN_SCRIPT = findLoginScript();
 
 // ── 参数解析 ─────────────────────────────────────────
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  if (args.length < 1) {
-    console.error("用法: node create-app.js <appName> [description] [icon] [iconColor]");
-    console.error('示例: node .claude/skills/yida-create-app/scripts/create-app.js "考勤管理" "员工考勤打卡系统" "xian-daka" "#00B853"');
-    console.error("\n可用图标:");
-    console.error("  xian-xinwen, xian-zhengfu, xian-yingyong, xian-xueshimao, xian-qiye,");
-    console.error("  xian-danju, xian-shichang, xian-jingli, xian-falv, xian-baogao,");
-    console.error("  huoche, xian-shenbao, xian-diqiu, xian-qiche, xian-feiji,");
-    console.error("  xian-diannao, xian-gongzuozheng, xian-gouwuche, xian-xinyongka,");
-    console.error("  xian-huodong, xian-jiangbei, xian-liucheng, xian-chaxun, xian-daka");
-    console.error("\n可用颜色:");
-    console.error("  #0089FF #00B853 #FFA200 #FF7357 #5C72FF");
-    console.error("  #85C700 #FFC505 #FF6B7A #8F66FF #14A9FF");
+  if (args.length < 3) {
+    console.error("用法: node verify-short-url.js <appType> <formUuid> <url>");
+    console.error("示例: node .claude/skills/yida-verify-short-url/scripts/verify-short-url.js \"APP_XXX\" \"FORM-XXX\" \"/o/aaa\"");
+    console.error("  支持两种格式：");
+    console.error("    /o/xxx - 公开访问（对外）");
+    console.error("    /s/xxx - 组织内分享（对内）");
     process.exit(1);
   }
+  const url = args[2];
+  const urlType = url.startsWith("/o/") ? "open" : url.startsWith("/s/") ? "share" : null;
   return {
-    appName: args[0],
-    description: args[1] || args[0],
-    icon: args[2] || "xian-yingyong",
-    iconColor: args[3] || "#0089FF",
+    appType: args[0],
+    formUuid: args[1],
+    url: url,
+    urlType: urlType,
   };
+}
+
+/**
+ * 验证 URL 格式
+ * - /o/xxx - 公开访问（对外）
+ * - /s/xxx - 组织内分享（对内）
+ */
+function validateUrl(url, urlType) {
+  if (!urlType) {
+    throw new Error(`URL 必须以 /o/ 或 /s/ 开头，当前值: ${url}`);
+  }
+  const pathPart = url.slice(3);
+  if (!/^[a-zA-Z0-9_-]+$/.test(pathPart)) {
+    throw new Error(`URL 路径部分只支持 a-z A-Z 0-9 _ -，当前值: ${url}`);
+  }
+  if (pathPart.length === 0) {
+    throw new Error(`URL 路径部分不能为空: ${url}`);
+  }
+  return true;
 }
 
 // ── 登录态管理 ───────────────────────────────────────
@@ -204,12 +147,15 @@ function extractInfoFromCookies(cookies) {
 }
 
 function loadCookieData() {
-  if (!fs.existsSync(COOKIE_FILE)) return null;
+  if (!fs.existsSync(COOKIE_FILE)) {
+    return null;
+  }
   try {
     const raw = fs.readFileSync(COOKIE_FILE, "utf-8").trim();
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     let cookieData;
+    // 兼容旧版纯数组格式
     if (Array.isArray(parsed)) {
       cookieData = { cookies: parsed, base_url: DEFAULT_BASE_URL };
     } else {
@@ -293,29 +239,12 @@ function refreshCsrfToken() {
   }
 }
 
-// ── 发送 registerApp 请求（支持 302 自动重登录） ────────
+// ── 发送 GET 请求（支持 302 自动重登录） ─────────────
 
-function buildRegisterPostData(csrfToken, appName, description, icon, iconColor) {
-  const iconValue = icon + "%%" + iconColor;
-  return querystring.stringify({
-    _csrf_token: csrfToken,
-    appName: JSON.stringify({ zh_CN: appName, en_US: appName, type: "i18n" }),
-    description: JSON.stringify({ zh_CN: description, en_US: description, type: "i18n" }),
-    icon: iconValue,
-    iconUrl: iconValue,
-    colour: "blue",
-    defaultLanguage: "zh_CN",
-    openExclusive: "n",
-    openPhysicColumn: "n",
-    openIsolationDatabase: "n",
-    openExclusiveUnit: "n",
-    group: "全部应用",
-  });
-}
-
-function sendRegisterRequest(baseUrl, csrfToken, cookies, appName, description, icon, iconColor) {
+function sendGetRequest(baseUrl, cookies, requestPath, queryParams) {
   return new Promise((resolve, reject) => {
-    const postData = buildRegisterPostData(csrfToken, appName, description, icon, iconColor);
+    const queryString = querystring.stringify(queryParams);
+    const fullPath = `${requestPath}?${queryString}`;
 
     const cookieHeader = cookies
       .map((cookie) => `${cookie.name}=${cookie.value}`)
@@ -328,19 +257,17 @@ function sendRegisterRequest(baseUrl, csrfToken, cookies, appName, description, 
     const requestOptions = {
       hostname: parsedUrl.hostname,
       port: parsedUrl.port || (isHttps ? 443 : 80),
-      path: "/query/app/registerApp.json",
-      method: "POST",
+      path: fullPath,
+      method: "GET",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Content-Length": Buffer.byteLength(postData),
         Origin: baseUrl,
         Referer: baseUrl + "/",
         Cookie: cookieHeader,
+        Accept: "application/json, text/json",
+        "x-requested-with": "XMLHttpRequest",
       },
       timeout: 30000,
     };
-
-    console.error("  发送 registerApp 请求...");
 
     const request = requestModule.request(requestOptions, (response) => {
       let responseData = "";
@@ -377,9 +304,10 @@ function sendRegisterRequest(baseUrl, csrfToken, cookies, appName, description, 
       reject(new Error("请求超时"));
     });
 
-    request.on("error", (requestError) => { reject(requestError); });
+    request.on("error", (requestError) => {
+      reject(requestError);
+    });
 
-    request.write(postData);
     request.end();
   });
 }
@@ -387,14 +315,25 @@ function sendRegisterRequest(baseUrl, csrfToken, cookies, appName, description, 
 // ── 主流程 ────────────────────────────────────────────
 
 async function main() {
-  const { appName, description, icon, iconColor } = parseArgs();
+  const { appType, formUuid, url, urlType } = parseArgs();
+  const urlLabel = urlType === "open" ? "公开访问路径" : "组织内分享路径";
 
   console.error("=".repeat(50));
-  console.error("  yida-create-app - 宜搭应用创建工具");
+  console.error("  verify-short-url - 宜搭 URL 验证工具");
   console.error("=".repeat(50));
-  console.error(`\n  应用名称: ${appName}`);
-  console.error(`  应用描述: ${description}`);
-  console.error(`  图标:     ${icon} (${iconColor})`);
+  console.error(`\n  应用 ID:      ${appType}`);
+  console.error(`  表单 UUID:    ${formUuid}`);
+  console.error(`  ${urlLabel}: ${url}`);
+
+  // Step 0: 验证 URL 格式
+  console.error("\n📋 Step 0: 验证 URL 格式");
+  try {
+    validateUrl(url, urlType);
+    console.error("  ✅ 格式验证通过");
+  } catch (err) {
+    console.error(`  ❌ 格式验证失败: ${err.message}`);
+    process.exit(1);
+  }
 
   // Step 1: 读取本地登录态
   console.error("\n🔑 Step 1: 读取登录态");
@@ -403,65 +342,100 @@ async function main() {
     console.error("  ⚠️  未找到本地登录态，触发登录...");
     cookieData = triggerLogin();
   }
-  let { csrf_token: csrfToken, cookies } = cookieData;
+  let { cookies } = cookieData;
   let baseUrl = resolveBaseUrl(cookieData);
   console.error(`  ✅ 登录态已就绪（${baseUrl}）`);
 
-  // Step 2: 创建应用（307 时刷新 csrf_token，302 时自动重登录，均自动重试）
-  console.error("\n📦 Step 2: 创建应用\n");
-  let response = await sendRegisterRequest(baseUrl, csrfToken, cookies, appName, description, icon, iconColor);
+  // Step 2: 验证 URL
+  console.error("\n🔍 Step 2: 验证 URL");
+  console.error("  发送 verifyShortUrl 请求...");
+  let { csrf_token: csrfToken } = cookieData;
+  
+  // 构建请求参数（根据 URL 类型选择参数名）
+  const requestParams = {
+    _api: "App.verifyShortUrlForm",
+    formUuid: formUuid,
+    _csrf_token: csrfToken,
+    _locale_time_zone_offset: "28800000",
+    _stamp: Date.now().toString(),
+  };
+  
+  if (urlType === "open") {
+    requestParams.openUrl = url;
+  } else {
+    requestParams.shareUrl = url;
+  }
 
-  if (response && response.__csrfExpired) {
+  let result = await sendGetRequest(
+    baseUrl,
+    cookies,
+    `/dingtalk/web/${appType}/query/formdesign/verifyShortUrl.json`,
+    requestParams
+  );
+
+  if (result && result.__csrfExpired) {
     cookieData = refreshCsrfToken();
     csrfToken = cookieData.csrf_token;
     cookies = cookieData.cookies;
     baseUrl = resolveBaseUrl(cookieData);
-    console.error("  🔄 重新发送 registerApp 请求（csrf_token 已刷新）...");
-    response = await sendRegisterRequest(baseUrl, csrfToken, cookies, appName, description, icon, iconColor);
+    requestParams._csrf_token = csrfToken;
+    requestParams._stamp = Date.now().toString();
+    console.error("  🔄 重新发送 verifyShortUrl 请求（csrf_token 已刷新）...");
+    result = await sendGetRequest(
+      baseUrl,
+      cookies,
+      `/dingtalk/web/${appType}/query/formdesign/verifyShortUrl.json`,
+      requestParams
+    );
   }
 
-  if (response && response.__needLogin) {
+  if (result && result.__needLogin) {
     cookieData = triggerLogin();
     csrfToken = cookieData.csrf_token;
     cookies = cookieData.cookies;
     baseUrl = resolveBaseUrl(cookieData);
-    console.error("  🔄 重新发送 registerApp 请求...");
-    response = await sendRegisterRequest(baseUrl, csrfToken, cookies, appName, description, icon, iconColor);
+    requestParams._csrf_token = csrfToken;
+    requestParams._stamp = Date.now().toString();
+    console.error("  🔄 重新发送 verifyShortUrl 请求...");
+    result = await sendGetRequest(
+      baseUrl,
+      cookies,
+      `/dingtalk/web/${appType}/query/formdesign/verifyShortUrl.json`,
+      requestParams
+    );
   }
 
   // 输出结果
   console.error("\n" + "=".repeat(50));
-  if (response && response.success && response.content) {
-    const appType = response.content;
-    const appUrl = `${baseUrl}/${appType}/admin`;
-    const corpId = cookieData.corpId || "";
-
-    console.error("  ✅ 应用创建成功！");
-    console.error(`  appType: ${appType}`);
-    console.error(`  corpId:  ${corpId || "未获取"}`);
-    console.error(`  访问地址: ${appUrl}`);
-    console.error("=".repeat(50));
-
-    // 更新 prd 文档中的 corpId
-    const rdFile = findRdFile();
-    if (rdFile) {
-      updateRdCorpId(rdFile, corpId, appType, baseUrl);
+  if (result && !result.__needLogin && !result.__csrfExpired) {
+    if (result.success && result.content) {
+      console.error("  ✅ URL 可用！");
+      console.error("=".repeat(50));
+      console.log(JSON.stringify({
+        available: true,
+        url: url,
+        urlType: urlType,
+        message: urlType === "open" ? "该公开访问路径可用" : "该组织内分享路径可用"
+      }, null, 2));
+    } else {
+      console.error("  ❌ URL 被占用");
+      console.error("=".repeat(50));
+      console.log(JSON.stringify({
+        available: false,
+        url: url,
+        urlType: urlType,
+        message: result.errorMsg || "该短链接已被占用",
+        errorCode: result.errorCode
+      }, null, 2));
     }
-
-    console.log(JSON.stringify({ success: true, appType, appName, corpId, url: appUrl }));
   } else {
-    const errorMsg = response ? response.errorMsg || "未知错误" : "请求失败";
-    console.error(`  ❌ 创建失败: ${errorMsg}`);
-    if (response && !response.__needLogin && !response.__csrfExpired) {
-      console.error(`  响应详情: ${JSON.stringify(response, null, 2)}`);
-    }
+    console.error("  ❌ 验证请求失败");
     console.error("=".repeat(50));
-    console.log(JSON.stringify({ success: false, error: errorMsg }));
     process.exit(1);
   }
 }
 
 main().catch((error) => {
-  console.error(`\n❌ 创建异常: ${error.message}`);
+  console.error(`\n❌ 验证异常: ${error.message}`);
   process.exit(1);
 });

@@ -7,34 +7,50 @@ from playwright.sync_api import sync_playwright
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+
 def find_project_root(start_dir):
-    """从 start_dir 向上查找含 README.md 或 .git 的项目根目录。"""
     current = start_dir
     while True:
-        if os.path.exists(os.path.join(current, "README.md")) or os.path.isdir(os.path.join(current, ".git")):
+        if ".claude/skills" in current:
+            parent = os.path.dirname(current)
+            if parent == current:
+                return start_dir
+            current = parent
+            continue
+
+        if os.path.exists(os.path.join(current, "README.md")) or os.path.isdir(
+            os.path.join(current, ".git")
+        ):
             return current
         parent = os.path.dirname(current)
         if parent == current:
             return start_dir
         current = parent
 
+
 PROJECT_ROOT = find_project_root(SCRIPT_DIR)
 CONFIG_FILE = os.path.join(PROJECT_ROOT, "config.json")
 COOKIE_FILE = os.path.join(PROJECT_ROOT, ".cache", "cookies.json")
+
 
 def load_config():
     """从项目根目录的 config.json 读取配置。"""
     if not os.path.exists(CONFIG_FILE):
         print(f"  ⚠️  config.json 不存在: {CONFIG_FILE}，使用默认值", file=sys.stderr)
-        return {"loginUrl": "https://www.aliwork.com/workPlatform", "defaultBaseUrl": "https://www.aliwork.com"}
+        return {
+            "loginUrl": "https://www.aliwork.com/workPlatform",
+            "defaultBaseUrl": "https://www.aliwork.com",
+        }
     with open(CONFIG_FILE, "r", encoding="utf-8") as file:
         return json.load(file)
+
 
 _config = load_config()
 LOGIN_URL = _config["loginUrl"]
 DEFAULT_BASE_URL = _config["defaultBaseUrl"]
 
 # ── Cookie 持久化 ─────────────────────────────────────
+
 
 def save_login_cache(cookies, base_url=None):
     """将 Cookie 和 base_url 一起保存到本地缓存文件。"""
@@ -45,6 +61,7 @@ def save_login_cache(cookies, base_url=None):
     with open(COOKIE_FILE, "w", encoding="utf-8") as file:
         json.dump(cache, file, ensure_ascii=False, indent=2)
     print(f"  Cookie 已保存到 {COOKIE_FILE}", file=sys.stderr)
+
 
 def load_login_cache():
     """
@@ -76,7 +93,9 @@ def load_login_cache():
 
     return None, None
 
+
 # ── 从 Cookie 列表中提取登录信息 ──────────────────────
+
 
 def extract_info_from_cookies(cookies):
     """
@@ -108,11 +127,55 @@ def extract_info_from_cookies(cookies):
             last_underscore = value.rfind("_")
             if last_underscore > 0:
                 corp_id = value[:last_underscore]
-                user_id = value[last_underscore + 1:]
+                user_id = value[last_underscore + 1 :]
 
     return csrf_token, corp_id, user_id
 
+
+# ── 仅检查登录态（不触发登录）────────────────────────────
+
+
+def check_login_only():
+    """
+    仅检查登录态，不触发登录。
+
+    用于 AI Agent 判断是否需要登录。
+    Returns:
+        返回登录信息字典，包含 can_auto_use 字段供 AI 判断
+    """
+    saved_cookies, saved_base_url = load_login_cache()
+
+    if not saved_cookies:
+        return {
+            "status": "not_logged_in",
+            "can_auto_use": False,
+            "message": "本地无 Cookie 缓存，需要扫码登录",
+        }
+
+    csrf_token, corp_id, user_id = extract_info_from_cookies(saved_cookies)
+
+    if not csrf_token:
+        return {
+            "status": "not_logged_in",
+            "can_auto_use": False,
+            "message": "Cookie 中无 tianshu_csrf_token，需要重新登录",
+        }
+
+    base_url = saved_base_url or DEFAULT_BASE_URL
+    return {
+        "status": "ok",
+        "can_auto_use": True,
+        "csrf_token": csrf_token,
+        "corp_id": corp_id,
+        "user_id": user_id,
+        "base_url": base_url,
+        "cookies": saved_cookies,
+        "message": f"✅ 已有有效登录态，可直接使用\n  组织: {corp_id}\n  用户: {user_id}\n  域名: {base_url}",
+    }
+
+
 # ── 验证本地缓存的 Cookie ─────────────────────────────
+
 
 def try_cached_login(saved_cookies, saved_base_url):
     """
@@ -139,7 +202,9 @@ def try_cached_login(saved_cookies, saved_base_url):
 
     return csrf_token, corp_id, user_id, base_url, saved_cookies
 
+
 # ── 有头扫码登录 ──────────────────────────────────────
+
 
 def interactive_login():
     """
@@ -180,7 +245,9 @@ def interactive_login():
     csrf_token, corp_id, user_id = extract_info_from_cookies(cookies)
 
     if not csrf_token:
-        print("  ❌ 登录成功但 Cookie 中无 tianshu_csrf_token，请重试。", file=sys.stderr)
+        print(
+            "  ❌ 登录成功但 Cookie 中无 tianshu_csrf_token，请重试。", file=sys.stderr
+        )
         sys.exit(1)
 
     print(f"  ✅ csrf_token: {csrf_token[:16]}...", file=sys.stderr)
@@ -192,7 +259,97 @@ def interactive_login():
     save_login_cache(cookies, base_url)
     return csrf_token, corp_id, user_id, base_url, cookies
 
+
+# ── 终端 ASCII 二维码登录 ─────────────────────────────
+
+
+def qrcode_login():
+    """在终端显示 ASCII 二维码，供用户扫码登录。"""
+    print("\n📱 正在获取登录二维码...", file=sys.stderr)
+
+    import qrcode
+    import time
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        context = browser.new_context()
+        page = context.new_page()
+
+        qr_url = None
+
+        def handle_response(response):
+            nonlocal qr_url
+            url = response.url
+            if "generate_qrcode" in url or "/generate_qrcode?" in url:
+                print(f"  Found QR API: {url[:60]}", file=sys.stderr)
+                try:
+                    data = response.json()
+                    print(f"  Response: {data}", file=sys.stderr)
+                    if data.get("success") and data.get("result"):
+                        qr_url = data["result"]
+                except Exception as e:
+                    print(f"  Error: {e}", file=sys.stderr)
+
+        page.on("response", handle_response)
+
+        dingtalk_login_url = "https://login.dingtalk.com/oauth2/challenge.htm?redirect_uri=https%3A%2F%2Fwww.aliwork.com%2Fdingtalk_sso_call_back%3Fcontinue%3Dhttps%253A%252F%252Fwww.aliwork.com%252FworkPlatform&response_type=code&client_id=suite9xvlxxerybljwheo&scope=openid+corpid&lang=zh_CN"
+        page.goto(dingtalk_login_url, timeout=120_000)
+
+        for _ in range(20):
+            if qr_url:
+                break
+            time.sleep(0.5)
+
+        if not qr_url:
+            print("  ❌ 无法获取二维码", file=sys.stderr)
+            browser.close()
+            sys.exit(1)
+
+        print(f"  ✅ 二维码获取成功\n", file=sys.stderr)
+
+        qr = qrcode.QRCode(version=1, box_size=1, border=1)
+        qr.add_data(qr_url)
+        qr.make(fit=True)
+
+        print("─" * 40, file=sys.stderr)
+        print("  请使用钉钉扫码登录", file=sys.stderr)
+        print("─" * 40 + "\n", file=sys.stderr)
+
+        qr.print_ascii(tty=True)
+
+        print("\n" + "─" * 40, file=sys.stderr)
+        print("  等待扫码登录（最长 10 分钟）...", file=sys.stderr)
+
+        start_time = time.time()
+        while time.time() - start_time < 600:
+            if "workPlatform" in page.url:
+                break
+            time.sleep(2)
+
+        if "workPlatform" not in page.url:
+            print("  ⏰ 登录超时", file=sys.stderr)
+            browser.close()
+            sys.exit(1)
+
+        page.wait_for_load_state("networkidle")
+        print("  ✅ 登录成功！", file=sys.stderr)
+
+        post_login_parsed = urlparse(page.url)
+        base_url = f"{post_login_parsed.scheme}://{post_login_parsed.netloc}"
+        cookies = context.cookies()
+        browser.close()
+
+    csrf_token, corp_id, user_id = extract_info_from_cookies(cookies)
+    if not csrf_token:
+        print("  ❌ 登录成功但无 csrf_token", file=sys.stderr)
+        sys.exit(1)
+
+    save_login_cache(cookies, base_url)
+    return csrf_token, corp_id, user_id, base_url, cookies
+
+
 # ── 核心入口 ──────────────────────────────────────────
+
 
 def ensure_login():
     """
@@ -214,7 +371,9 @@ def ensure_login():
 
     return interactive_login()
 
+
 # ── 刷新 csrf_token（TIANSHU_000030 场景） ────────────
+
 
 def refresh_csrf_token():
     """
@@ -244,9 +403,15 @@ def refresh_csrf_token():
     print(f"  ✅ csrf_token 提取成功: {csrf_token[:16]}...", file=sys.stderr)
     return csrf_token, corp_id, user_id, base_url, saved_cookies
 
+
 # ── CLI 入口 ──────────────────────────────────────────
 
+
 def main():
+    if "--check-only" in sys.argv:
+        result = check_login_only()
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
     # 支持 --refresh-csrf 模式：仅重新提取 csrf_token，不重新扫码登录
     if "--refresh-csrf" in sys.argv:
         print("=" * 50, file=sys.stderr)
@@ -254,6 +419,13 @@ def main():
         print("=" * 50, file=sys.stderr)
 
         csrf_token, corp_id, user_id, base_url, cookies = refresh_csrf_token()
+    elif "--qrcode" in sys.argv:
+        print("=" * 50, file=sys.stderr)
+        print("  yida-login - 终端二维码登录", file=sys.stderr)
+        print("=" * 50, file=sys.stderr)
+        print(f"\n  登录地址: {LOGIN_URL}", file=sys.stderr)
+
+        csrf_token, corp_id, user_id, base_url, cookies = qrcode_login()
     else:
         print("=" * 50, file=sys.stderr)
         print("  yida-login - 宜搭登录态管理工具", file=sys.stderr)
@@ -279,6 +451,7 @@ def main():
         "cookies": cookies,
     }
     print(json.dumps(output, ensure_ascii=False))
+
 
 if __name__ == "__main__":
     main()

@@ -89,34 +89,17 @@ yida-create-page/
 
 ## 接口说明
 
-### saveFormSchemaInfo（创建页面）
+`saveFormSchemaInfo` 接口的完整参数、返回值和错误处理机制，请参考 `reference/yida-api.md` 文档中的「表单设计类 API」章节。
 
-- **地址**：`POST /dingtalk/web/{appType}/query/formdesign/saveFormSchemaInfo.json`
-- **Content-Type**：`application/x-www-form-urlencoded`
-- **参数**：
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `_csrf_token` | String | 是 | CSRF Token（由 yida-login 获取） |
-| `formType` | String | 是 | 页面类型，固定 `display` |
-| `title` | String (JSON) | 是 | 页面名称，i18n 格式：`{"zh_CN":"名称","en_US":"名称","type":"i18n"}` |
-
-- **返回值**：
-
-```json
-{
-  "content": { "formUuid": "FORM-XXX" },
-  "success": true
-}
-```
-
-`content.formUuid` 即为新创建的页面 ID。
+> **注意**：创建自定义页面时，`formType` 参数固定为 `display`（区别于表单页面的 `receipt`）。
 
 ## 与其他技能配合
 
 1. **创建应用** → 使用 `yida-create-app` 技能获取 `appType`
 2. **创建自定义页面** → 本技能，获取 `pageId`（formUuid）
-3. **编写 JSX 源码** → 参考 `yida` 技能的开发规范
-4. **部署页面代码** → 使用 `yida-publish` 技能将代码部署到该页面
+3. **编写 JSX 源码** → **必须先加载 `yida-custom-page` skill**，严格按照其开发规范编写代码
+4. **部署页面代码** → 使用 `yida-publish-page` 技能将代码部署到该页面
+
+> ⚠️ **重要警告**：宜搭自定义页面使用类组件模式，**禁止使用 React Hooks**（useState/useEffect）。编写代码前必须先加载 `yida-custom-page` skill 查看完整的开发规范。
 
 > **提示**：如果需要创建的是表单页面（带字段的数据收集页），请使用 `yida-create-form-page` 技能。

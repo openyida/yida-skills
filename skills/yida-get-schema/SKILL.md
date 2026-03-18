@@ -56,7 +56,7 @@ node .claude/skills/yida-get-schema/scripts/get-schema.js <appType> <formUuid>
 **示例**：
 
 ```bash
-node .claude/skills/get-schema/scripts/get-schema.js "APP_XXX" "FORM-XXX"
+node .claude/skills/yida-get-schema/scripts/get-schema.js "APP_XXX" "FORM-XXX"
 ```
 
 **输出**：日志输出到 stderr，Schema JSON 输出到 stdout。
@@ -84,18 +84,7 @@ get-schema/
 
 ## 接口说明
 
-### getFormSchema（获取表单 Schema）
-
-- **地址**：`GET /alibaba/web/{appType}/_view/query/formdesign/getFormSchema.json`
-- **参数**：
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| `formUuid` | String | 是 | 表单 UUID |
-| `schemaVersion` | String | 否 | Schema 版本，默认 `V5` |
-
-- **返回值**：
-完整的表单 Schema JSON，包含 `pages` 数组，结构与 `saveFormSchema` 保存的格式一致。各字段的 `fieldId`（如 `textField_xxxxxxxx`）可从 Schema 中读取。
+`getFormSchema` 接口的完整参数、返回值和错误处理机制，请参考 `reference/yida-api.md` 文档中的「表单设计类 API」章节。
 
 ## 与其他技能配合
 
