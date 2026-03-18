@@ -298,7 +298,7 @@ def main():
         if options["inst_id"]:
             print("  ✅ 实例详情查询成功！", file=sys.stderr)
         else:
-            total = result.get("result", {}).get("totalCount", 0)
+            total = result.get("content", {}).get("totalCount", 0)
             print(f"  ✅ 查询成功！共 {total} 条记录", file=sys.stderr)
         print("=" * 50, file=sys.stderr)
         print(json.dumps(result, ensure_ascii=False, indent=2))
