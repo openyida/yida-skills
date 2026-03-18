@@ -184,12 +184,55 @@ yida-query-data/
 
 `--search-json` 参数支持以下字段类型：
 
+### 快速参考
+
 ```json
-{
-  "textField_xxx": "精确匹配",
-  "numberField_xxx": ["1", "10"],
-  "radioField_xxx": "选项一",
-  "selectField_xxx": "选项一",
-  "dateField_xxx": [1514736000000, 1517414399000]
-}
+[
+  {
+    "key": "字段ID",
+    "value": "搜索值",
+    "type": "字段类型",
+    "operator": "操作符",
+    "componentName": "组件名称"
+  }
+]
 ```
+
+### 常用查询示例
+
+#### 单行文本
+```bash
+--search-json '[{"key":"textField_xxx","value":"A","type":"TEXT","operator":"eq","componentName":"TextField"}]'
+```
+
+#### 数值范围
+```bash
+--search-json '[{"key":"numberField_xxx","value":[10,100],"type":"DOUBLE","operator":"between","componentName":"NumberField"}]'
+```
+
+#### 日期范围（毫秒时间戳）
+```bash
+--search-json '[{"key":"dateField_xxx","value":[1704067200000,1706745600000],"type":"DOUBLE","operator":"between","componentName":"DateField"}]'
+```
+
+#### 成员选择
+```bash
+--search-json '[{"key":"employeeField_xxx","value":"2212173665758008","type":"STRING","operator":"eq","componentName":"EmployeeField"}]'
+```
+
+#### 多条件组合
+```bash
+--search-json '[{"key":"textField_xxx","value":"A","type":"TEXT","operator":"eq","componentName":"TextField"},{"key":"numberField_xxx","value":10,"type":"DOUBLE","operator":"gt","componentName":"NumberField"}]'
+```
+
+### 📖 详细文档
+
+**完整查询条件格式说明，请查看：**
+👉 [QUERY_CONDITION_GUIDE.md](./QUERY_CONDITION_GUIDE.md)
+
+该文档包含：
+- 所有 15+ 种字段类型的查询格式
+- 各操作符（eq、like、between、gt 等）使用说明
+- 多条件组合（AND 关系）示例
+- 常见错误及解决方法
+- 如何获取字段 ID
